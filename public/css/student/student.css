@@ -1,0 +1,13 @@
+.student-dashboard {
+    padding-top: 1rem;
+    padding-bottom: 2rem;
+}
+
+.student-dashboard .streak-badge {
+    background: #fff3cd;
+    border: 1px solid #ffeeba;
+    padding: 0.5rem 1rem;
+    border-radius: 50rem;
+    font-weight: 500;
+    color: #856404;
+}

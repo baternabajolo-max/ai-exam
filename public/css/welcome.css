@@ -1,0 +1,57 @@
+:root {
+    --primary-blue: #0d6efd;
+    --dark-blue: #0b5ed7;
+    --light-blue-bg: #f8fbff;
+    --border-blue: #cfe2ff;
+}
+
+body {
+    background-color: var(--light-blue-bg);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #334155;
+}
+
+/* Hero Section Styling */
+.hero-badge {
+    background-color: var(--border-blue);
+    color: var(--primary-blue);
+    font-weight: 600;
+}
+
+.hero-card {
+    border: none;
+    border-radius: 1rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hero-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 .5rem 1rem rgba(13, 110, 253, 0.1) !important;
+}
+
+/* Parallax Section */
+.parallax-section {
+    background-image: linear-gradient(rgba(11, 94, 215, 0.9), rgba(13, 110, 253, 0.85)), url('https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=1920&auto=format&fit=crop');
+    min-height: 400px;
+    background-attachment: fixed;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    position: relative;
+    color: #fff;
+    display: flex;
+    align-items: center;
+}
+
+/* Leaderboard Preview Styling */
+.leaderboard-table th {
+    background-color: var(--light-blue-bg);
+    color: var(--primary-blue);
+    font-weight: 600;
+}
+
+/* Footer Design */
+footer {
+    background-color: #ffffff;
+    border-top: 1px solid var(--border-blue);
+}
