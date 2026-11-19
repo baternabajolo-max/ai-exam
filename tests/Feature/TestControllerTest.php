@@ -78,6 +78,25 @@ class TestControllerTest extends TestCase
             'options' => ['HTTPS', 'FTP', 'SMTP', 'HTTP'],
             'correct_answer' => 'HTTPS',
             'topic' => 'Network security',
+            'difficulty' => 'moderate',
+        ]);
+        QuestionBankItem::create([
+            'course_id' => $course->id,
+            'author_id' => $faculty->id,
+            'question' => 'Which protocol provides a secure transport channel?',
+            'options' => ['TLS', 'FTP', 'SMTP', 'HTTP'],
+            'correct_answer' => 'TLS',
+            'topic' => 'Network security',
+            'difficulty' => 'easy',
+        ]);
+        QuestionBankItem::create([
+            'course_id' => $course->id,
+            'author_id' => $faculty->id,
+            'question' => 'Which protocol transfers web pages?',
+            'options' => ['HTTP', 'FTP', 'SMTP', 'DNS'],
+            'correct_answer' => 'HTTP',
+            'topic' => 'Web protocols',
+            'difficulty' => 'hard',
         ]);
 
         $this->actingAs($admin)
@@ -85,10 +104,34 @@ class TestControllerTest extends TestCase
             ->assertSee('data-bs-target="#createExamModal"', false)
             ->assertSee('id="createExamModal"', false)
             ->assertSee('name="title"', false)
-            ->assertSee('name="question_count"', false)
             ->assertSee('exam-builder__question-picker', false)
             ->assertSee('name="question_bank_item_ids[]"', false)
-            ->assertSee('Choose random questions automatically')
+            ->assertSee('id="auto-pick-topic"', false)
+            ->assertSee('id="auto-pick-difficulty"', false)
+            ->assertSee('id="auto-pick-count"', false)
+            ->assertSee('exam-builder__pool-summary', false)
+            ->assertSee('Total Available')
+            ->assertSee('3 questions')
+            ->assertSee('across 2 topics')
+            ->assertSee('Difficulty Breakdown')
+            ->assertSee('1 Easy · 1 Moderate · 1 Hard')
+            ->assertSee('exam-builder__pool-difficulty--easy', false)
+            ->assertSee('exam-builder__pool-difficulty--moderate', false)
+            ->assertSee('exam-builder__pool-difficulty--hard', false)
+            ->assertSee('Selected for Exam')
+            ->assertSee('id="modal-selected-question-count"', false)
+            ->assertSee('id="modal-selected-question-breakdown"', false)
+            ->assertSee('0 selected')
+            ->assertSee('All Topics')
+            ->assertDontSee('All Topics (3)')
+            ->assertSee('Network security (2 items)')
+            ->assertSee('Web protocols (1 item)')
+            ->assertSee('Auto-Pick')
+            ->assertSee('Clear selection')
+            ->assertDontSee('exam-builder__step-nav', false)
+            ->assertDontSee('Subject or topic')
+            ->assertDontSee('name="topic"', false)
+            ->assertDontSee('name="question_count"', false)
             ->assertSee($faculty->name."'s bank", false)
             ->assertSee($faculty->name);
     }
@@ -136,9 +179,13 @@ class TestControllerTest extends TestCase
             ->assertSee(route('admin.tests.store-manual'), false)
             ->assertSee('All 2 questions in this program are available')
             ->assertSee('exam-builder__question-picker', false)
+            ->assertSee('exam-builder__pool-summary', false)
+            ->assertSee('Selected for Exam')
             ->assertSee('name="question_bank_item_ids[]"', false)
-            ->assertSee('name="question_count"', false)
-            ->assertSee('Choose random questions automatically')
+            ->assertSee('id="auto-pick-topic"', false)
+            ->assertSee('Auto-Pick')
+            ->assertDontSee('exam-builder__step-nav', false)
+            ->assertDontSee('Subject or topic')
             ->assertSee($ownItem->question)
             ->assertSee($sharedItem->question)
             ->assertDontSee('Question from another college?')
@@ -450,8 +497,19 @@ class TestControllerTest extends TestCase
         $faculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
         $otherFaculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
         $admin = User::factory()->create(['role' => 'super-admin']);
+        $networkTopic = Topic::create([
+            'course_id' => $course->id,
+            'created_by' => $faculty->id,
+            'name' => 'Network security',
+        ]);
+        $protocolTopic = Topic::create([
+            'course_id' => $course->id,
+            'created_by' => $otherFaculty->id,
+            'name' => 'Web protocols',
+        ]);
         $item = QuestionBankItem::create([
             'course_id' => $course->id,
+            'topic_id' => $networkTopic->id,
             'author_id' => $faculty->id,
             'question' => 'What protects web traffic?',
             'options' => ['HTTPS', 'FTP', 'SMTP', 'HTTP'],
@@ -460,10 +518,20 @@ class TestControllerTest extends TestCase
         ]);
         $otherItem = QuestionBankItem::create([
             'course_id' => $course->id,
+            'topic_id' => $protocolTopic->id,
             'author_id' => $otherFaculty->id,
             'question' => 'Which protocol transfers web pages?',
             'options' => ['HTTPS', 'FTP', 'SMTP', 'IMAP'],
             'correct_answer' => 'HTTPS',
+            'topic' => 'Network security',
+        ]);
+        $sameTopicItem = QuestionBankItem::create([
+            'course_id' => $course->id,
+            'topic_id' => $networkTopic->id,
+            'author_id' => $faculty->id,
+            'question' => 'Which layer secures a web connection?',
+            'options' => ['Transport', 'Network', 'Application', 'Physical'],
+            'correct_answer' => 'Transport',
             'topic' => 'Network security',
         ]);
 
@@ -471,13 +539,11 @@ class TestControllerTest extends TestCase
             ->post(route('super-admin.tests.store-manual'), [
                 'course_id' => $course->id,
                 'title' => 'Network Security Midterm',
-                'topic' => 'Network security',
                 'description' => 'Answer every question.',
                 'available_from' => '2026-03-20T11:00',
                 'available_until' => '2026-03-20T13:00',
                 'time_limit' => 60,
-                'question_count' => 2,
-                'question_bank_item_ids' => [$item->id, $otherItem->id],
+                'question_bank_item_ids' => [$item->id, $otherItem->id, $sameTopicItem->id],
             ])
             ->assertRedirect(route('super-admin.tests.index'))
             ->assertSessionHas('success');
@@ -490,14 +556,15 @@ class TestControllerTest extends TestCase
             'created_by' => $admin->id,
             'is_scheduled_exam' => true,
             'is_published' => true,
+            'topic' => 'Network security, Web protocols',
         ]);
         $this->assertSame('Scheduled', $exam->scheduleStatus());
-        $this->assertSame(2, $exam->questions()->count());
+        $this->assertSame(3, $exam->questions()->count());
         $questionIds = $exam->questions()->pluck('question_bank_item_id')->all();
         sort($questionIds);
 
         $this->assertSame(
-            collect([$item->id, $otherItem->id])->sort()->values()->all(),
+            collect([$item->id, $otherItem->id, $sameTopicItem->id])->sort()->values()->all(),
             $questionIds,
         );
     }
@@ -567,14 +634,20 @@ class TestControllerTest extends TestCase
         $this->assertDatabaseMissing('tests', ['title' => 'Invalid window']);
     }
 
-    public function test_faculty_must_select_exactly_the_requested_number_of_questions(): void
+    public function test_faculty_can_manually_select_questions_without_a_topic_or_auto_pick_count(): void
     {
         $this->travelTo('2026-03-20 10:00:00');
         $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
         $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
         $faculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $topic = Topic::create([
+            'course_id' => $course->id,
+            'created_by' => $faculty->id,
+            'name' => 'Algorithms',
+        ]);
         $item = QuestionBankItem::create([
             'course_id' => $course->id,
+            'topic_id' => $topic->id,
             'author_id' => $faculty->id,
             'question' => 'Question from this program?',
             'options' => ['A', 'B', 'C', 'D'],
@@ -584,18 +657,18 @@ class TestControllerTest extends TestCase
         $this->actingAs($faculty)
             ->post(route('admin.tests.store-manual'), [
                 'course_id' => $course->id,
-                'title' => 'Question count validation',
-                'topic' => 'Topic',
+                'title' => 'Manual selection without auto-pick',
                 'available_from' => '2026-03-22T10:00',
                 'time_limit' => 60,
-                'question_count' => 2,
+                'auto_pick_count' => 2,
                 'question_bank_item_ids' => [$item->id],
             ])
-            ->assertSessionHasErrors([
-                'question_bank_item_ids' => 'Select exactly the number of questions you entered.',
-            ]);
+            ->assertRedirect(route('admin.tests.index'))
+            ->assertSessionHas('success', 'Examination request submitted for Admin approval.');
 
-        $this->assertDatabaseMissing('tests', ['title' => 'Question count validation']);
+        $exam = Exam::query()->where('title', 'Manual selection without auto-pick')->firstOrFail();
+        $this->assertSame('Algorithms', $exam->topic);
+        $this->assertSame(1, $exam->questions()->count());
     }
 
     public function test_faculty_can_schedule_an_exam_for_today_and_sees_a_two_day_scheduling_note(): void

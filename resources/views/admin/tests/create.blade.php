@@ -1,7 +1,9 @@
 @extends('layouts.app')
 
 @section('content')
-@php($isFacultyRequest = auth()->user()->role === 'admin')
+@php
+    $isFacultyRequest = auth()->user()->role === 'admin';
+@endphp
 <style>
     .exam-builder__hero {
         background:
@@ -203,65 +205,123 @@
         width: 2rem;
     }
 
-    .exam-builder__selection-count {
-        min-width: 7rem;
-        text-align: center;
-    }
-
-    .exam-builder__step-nav {
+    .exam-builder__pool-summary {
         display: grid;
-        gap: .6rem;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .75rem;
+        grid-template-columns: minmax(0, .95fr) minmax(0, 1.3fr) minmax(0, .95fr);
     }
 
-    .exam-builder__step-link {
-        align-items: center;
+    .exam-builder__pool-metric {
         background: var(--bs-body-bg);
         border: 1px solid #e2e8f0;
-        border-radius: .8rem;
-        color: var(--bs-body-color);
+        border-radius: .9rem;
+        box-shadow: 0 .3rem .8rem rgb(15 23 42 / 5%);
         display: flex;
-        gap: .65rem;
-        min-height: 2.85rem;
-        padding: .55rem .75rem;
-        text-decoration: none;
-        transition: border-color .18s ease, background-color .18s ease;
+        flex-direction: column;
+        gap: .5rem;
+        min-width: 0;
+        padding: .9rem 1rem;
     }
 
-    .exam-builder__step-link:hover,
-    .exam-builder__step-link:focus-visible {
-        background: #eef2ff;
-        border-color: #a5b4fc;
-        color: #312e81;
+    .exam-builder__pool-metric--selected {
+        background: linear-gradient(145deg, #eef2ff, #fff);
+        border-color: #c7d2fe;
     }
 
-    .exam-builder__step-number {
+    .exam-builder__pool-label {
+        color: #64748b;
+        font-size: .8rem;
+        font-weight: 650;
+    }
+
+    .exam-builder__pool-value {
+        color: #0f172a;
+        font-size: 1.1rem;
+        font-variant-numeric: tabular-nums;
+        font-weight: 750;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+    }
+
+    .exam-builder__pool-detail {
+        color: #64748b;
+        font-size: .78rem;
+    }
+
+    .exam-builder__pool-breakdown {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .4rem;
+    }
+
+    .exam-builder__pool-difficulty {
         align-items: center;
-        background: #e0e7ff;
-        border-radius: 50%;
-        color: #3730a3;
+        border: 1px solid transparent;
+        border-radius: .55rem;
         display: inline-flex;
-        flex: 0 0 auto;
-        font-size: .75rem;
-        font-weight: 800;
-        height: 1.7rem;
-        justify-content: center;
-        width: 1.7rem;
+        font-size: .78rem;
+        font-weight: 600;
+        gap: .3rem;
+        line-height: 1.2;
+        min-height: 2rem;
+        padding: .35rem .55rem;
+        white-space: nowrap;
+    }
+
+    .exam-builder__pool-difficulty--easy {
+        background: #ecfdf5;
+        border-color: #a7f3d0;
+        color: #065f46;
+    }
+
+    .exam-builder__pool-difficulty--moderate {
+        background: #fffbeb;
+        border-color: #fde68a;
+        color: #92400e;
+    }
+
+    .exam-builder__pool-difficulty--hard {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #991b1b;
+    }
+
+    .exam-builder__auto-pick-button {
+        min-height: 2.85rem;
+        white-space: nowrap;
+    }
+
+    .exam-builder__selection-feedback {
+        min-height: 1.5rem;
+    }
+
+    .exam-builder__selection-feedback p {
+        max-width: 70ch;
+    }
+
+    .exam-builder__clear-selection {
+        min-height: 2.75rem;
+        white-space: nowrap;
     }
 
     .exam-builder__question-picker {
+        background: #f8fafc;
         border: 1px solid #e2e8f0;
+        display: grid;
+        gap: .75rem;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr));
         border-radius: .9rem;
         max-height: 17rem;
         overflow-y: auto;
         overscroll-behavior: contain;
-        padding: .65rem;
+        padding: .75rem;
         scrollbar-gutter: stable;
     }
 
     .exam-builder__question-picker .exam-builder__question-card {
         box-shadow: none;
-        padding: .85rem !important;
+        min-height: 100%;
+        padding: 1rem !important;
     }
 
     .exam-builder__question-picker .exam-builder__question-card:hover {
@@ -296,6 +356,16 @@
 
         .exam-builder__modal .modal-footer .btn {
             width: 100%;
+        }
+
+        .exam-builder__pool-metric {
+            padding: .75rem;
+        }
+    }
+
+    @media (max-width: 767.98px) {
+        .exam-builder__pool-summary {
+            grid-template-columns: 1fr;
         }
     }
 
@@ -338,31 +408,49 @@
         color: #c7d2fe;
     }
 
-    html[data-bs-theme="dark"] .exam-builder__step-link {
-        border-color: #334155;
-    }
-
-    html[data-bs-theme="dark"] .exam-builder__step-link:hover,
-    html[data-bs-theme="dark"] .exam-builder__step-link:focus-visible {
-        background: #262f57;
-        border-color: #6366f1;
-        color: #e0e7ff;
-    }
-
-    html[data-bs-theme="dark"] .exam-builder__step-number {
-        background: #3730a3;
-        color: #e0e7ff;
-    }
-
     html[data-bs-theme="dark"] .exam-builder__question-picker {
+        background: #111827;
         border-color: #334155;
     }
 
-    @media (prefers-reduced-motion: reduce) {
-        .exam-builder__step-link {
-            transition: none;
-        }
+    html[data-bs-theme="dark"] .exam-builder__pool-metric {
+        background: #1e293b;
+        border-color: #334155;
+        box-shadow: 0 .3rem .8rem rgb(0 0 0 / 18%);
     }
+
+    html[data-bs-theme="dark"] .exam-builder__pool-metric--selected {
+        background: linear-gradient(145deg, #262f57, #1e293b);
+        border-color: #4855a3;
+    }
+
+    html[data-bs-theme="dark"] .exam-builder__pool-label,
+    html[data-bs-theme="dark"] .exam-builder__pool-detail {
+        color: #94a3b8;
+    }
+
+    html[data-bs-theme="dark"] .exam-builder__pool-value {
+        color: #f8fafc;
+    }
+
+    html[data-bs-theme="dark"] .exam-builder__pool-difficulty--easy {
+        background: #12362f;
+        border-color: #1d5a4b;
+        color: #a7f3d0;
+    }
+
+    html[data-bs-theme="dark"] .exam-builder__pool-difficulty--moderate {
+        background: #3b2e14;
+        border-color: #6b4d18;
+        color: #fde68a;
+    }
+
+    html[data-bs-theme="dark"] .exam-builder__pool-difficulty--hard {
+        background: #3b1f26;
+        border-color: #6b2b38;
+        color: #fecaca;
+    }
+
 </style>
 
 <main class="container py-4 exam-builder">
@@ -503,84 +591,138 @@
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body px-4">
-                            <nav class="exam-builder__step-nav mb-4" aria-label="Exam setup sections">
-                                <a class="exam-builder__step-link" href="#exam-selection-heading">
-                                    <span class="exam-builder__step-number">1</span>
-                                    <span class="small fw-semibold">Choose questions</span>
-                                </a>
-                                <a class="exam-builder__step-link" href="#exam-details-heading">
-                                    <span class="exam-builder__step-number">2</span>
-                                    <span class="small fw-semibold">Details &amp; schedule</span>
-                                </a>
-                            </nav>
                             <section class="rounded-4 bg-body-tertiary p-3 p-md-4 mb-4" aria-labelledby="exam-selection-heading">
-                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                                <div class="mb-3">
                                     <div>
                                         <h3 class="h6 fw-bold mb-1" id="exam-selection-heading">Choose your questions</h3>
-                                        <p class="small text-muted mb-0">Set the number of items, then choose from this program's bank or randomize.</p>
+                                        <p class="small text-muted mb-0">Filter by topic and difficulty, auto-pick questions, or select them manually.</p>
                                     </div>
-                                    <span class="badge rounded-pill text-bg-primary px-3 py-2 exam-builder__selection-count" id="modal-selected-question-count" role="status" aria-live="polite">0 selected</span>
                                 </div>
-                                <div class="row g-3 align-items-center">
-                                    <div class="col-sm-5 col-md-4">
-                                        <label for="question-count" class="form-label fw-semibold">Number of exam items</label>
-                                        <input
-                                            id="question-count"
-                                            class="form-control form-control-lg"
-                                            type="number"
-                                            name="question_count"
-                                            value="{{ old('question_count', min(10, $questionBankItems->count())) }}"
-                                            min="1"
-                                            max="{{ min(100, $questionBankItems->count()) }}"
-                                            required
-                                        >
+                                <div class="exam-builder__pool-summary mb-3" role="group" aria-label="Question Bank pool summary">
+                                    <div class="exam-builder__pool-metric">
+                                        <span class="exam-builder__pool-label">Total Available</span>
+                                        <span class="exam-builder__pool-value tabular-nums">{{ $totalQuestions }} {{ \Illuminate\Support\Str::plural('question', $totalQuestions) }}</span>
+                                        <span class="exam-builder__pool-detail tabular-nums">across {{ $topicsCount }} {{ \Illuminate\Support\Str::plural('topic', $topicsCount) }}</span>
                                     </div>
-                                    <div class="col-sm-7 col-md-8">
-                                        <div class="form-check form-switch border rounded-3 p-3 ps-5 bg-body">
-                                            <input class="form-check-input" type="checkbox" role="switch" id="random-question-selection">
-                                            <label class="form-check-label fw-semibold" for="random-question-selection">Choose random questions automatically</label>
-                                            <div class="small text-muted">Selects exactly the item count above from all available questions.</div>
+                                    <div class="exam-builder__pool-metric">
+                                        <span class="exam-builder__pool-label">Difficulty Breakdown</span>
+                                        <div
+                                            class="exam-builder__pool-breakdown"
+                                            role="group"
+                                            aria-label="{{ $easyCount }} Easy · {{ $moderateCount }} Moderate · {{ $hardCount }} Hard"
+                                        >
+                                            <span class="exam-builder__pool-difficulty exam-builder__pool-difficulty--easy">
+                                                <span class="tabular-nums">{{ $easyCount }}</span> Easy
+                                            </span>
+                                            <span class="exam-builder__pool-difficulty exam-builder__pool-difficulty--moderate">
+                                                <span class="tabular-nums">{{ $moderateCount }}</span> Moderate
+                                            </span>
+                                            <span class="exam-builder__pool-difficulty exam-builder__pool-difficulty--hard">
+                                                <span class="tabular-nums">{{ $hardCount }}</span> Hard
+                                            </span>
                                         </div>
                                     </div>
-                                </div>
-                                <div class="small text-danger mt-2" id="question-selection-error" role="alert" hidden>Select exactly the requested number of questions below, or use random selection.</div>
-                                <div class="exam-builder__question-picker mt-3">
-                                    <div class="row g-2">
-                                        @foreach ($questionBankItems as $item)
-                                            <div class="col-12 col-md-6">
-                                                <label class="exam-builder__question-card d-flex gap-3 align-items-start h-100">
-                                                    <input
-                                                        class="form-check-input mt-1 js-exam-question"
-                                                        type="checkbox"
-                                                        name="question_bank_item_ids[]"
-                                                        value="{{ $item->id }}"
-                                                        @checked(in_array($item->id, (array) old('question_bank_item_ids', [])))
-                                                    >
-                                                    <span class="exam-builder__question-copy flex-grow-1">
-                                                        <span class="badge rounded-pill text-bg-light mb-2">{{ $item->topic ?: 'General' }}</span>
-                                                        <span class="badge rounded-pill {{ $item->difficulty === 'hard' ? 'text-bg-danger' : ($item->difficulty === 'easy' ? 'text-bg-success' : 'text-bg-warning') }} mb-2">{{ ucfirst($item->difficulty ?? 'moderate') }}</span>
-                                                        <span class="exam-builder__question-text d-block fw-semibold">{{ $item->question }}</span>
-                                                        @if ($item->image_path)
-                                                            <img src="{{ asset('storage/'.$item->image_path) }}" alt="Question illustration" class="img-fluid rounded border mt-2" style="max-height: 7rem; object-fit: contain;">
-                                                        @endif
-                                                        <span class="small text-muted mt-2 d-block">{{ count($item->options ?? []) }} answer choices · {{ $item->author->name ?? 'Former Faculty' }}'s bank</span>
-                                                    </span>
-                                                </label>
-                                            </div>
-                                        @endforeach
+                                    <div class="exam-builder__pool-metric exam-builder__pool-metric--selected">
+                                        <span class="exam-builder__pool-label">Selected for Exam</span>
+                                        <span class="exam-builder__pool-value tabular-nums" id="modal-selected-question-count" role="status" aria-live="polite">0 selected</span>
+                                        <span class="exam-builder__pool-detail" id="modal-selected-question-breakdown">No questions selected yet</span>
                                     </div>
+                                </div>
+                                <div class="row g-2 align-items-end exam-builder__quick-pick mb-3">
+                                    <div class="col-12 col-md-4">
+                                        <label for="auto-pick-topic" class="form-label small fw-semibold mb-1">Topic</label>
+                                        <select id="auto-pick-topic" class="form-select">
+                                            <option value="">All Topics</option>
+                                            @foreach ($questionBankTopics as $topic)
+                                                <option value="{{ $topic['key'] }}">{{ $topic['name'] }} ({{ $topic['count'] }} {{ \Illuminate\Support\Str::plural('item', $topic['count']) }})</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-3">
+                                        <label for="auto-pick-difficulty" class="form-label small fw-semibold mb-1">Difficulty</label>
+                                        <select id="auto-pick-difficulty" class="form-select">
+                                            <option value="all">All Difficulties</option>
+                                            <option value="easy">Easy</option>
+                                            <option value="moderate">Moderate</option>
+                                            <option value="hard">Hard</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6 col-md-2">
+                                        <label for="auto-pick-count" class="form-label small fw-semibold mb-1">Number of questions</label>
+                                        <input
+                                            id="auto-pick-count"
+                                            class="form-control"
+                                            type="number"
+                                            value="{{ min(5, $questionBankItems->count()) }}"
+                                            min="1"
+                                            max="{{ min(100, $questionBankItems->count()) }}"
+                                        >
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <button class="btn btn-outline-primary w-100 exam-builder__auto-pick-button" id="auto-pick-questions" type="button">
+                                            <i class="bi bi-shuffle me-1" aria-hidden="true"></i>Auto-Pick
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="exam-builder__selection-feedback d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                    <p id="auto-pick-status" class="small text-muted mb-0" role="status" aria-live="polite"></p>
+                                    <button class="btn btn-link btn-sm text-muted text-nowrap px-1 exam-builder__clear-selection" id="clear-exam-selection" type="button" hidden>
+                                        Clear selection
+                                    </button>
+                                </div>
+                                <div class="small text-danger mt-2" id="question-selection-error" role="alert" hidden></div>
+                                @error('question_bank_item_ids')
+                                    <div class="small text-danger mt-2" role="alert">{{ $message }}</div>
+                                @enderror
+                                <div class="exam-builder__question-picker mt-3">
+                                    @foreach ($questionBankItems as $item)
+                                        @php
+                                            $examTopicName = trim((string) ($item->topicRecord?->name ?? $item->topic ?? 'General'));
+                                            $examTopicKey = mb_strtolower($examTopicName, 'UTF-8');
+                                            $examDifficulty = strtolower((string) ($item->difficulty ?? 'moderate'));
+                                            $examDifficulty = in_array($examDifficulty, ['easy', 'hard'], true) ? $examDifficulty : 'moderate';
+                                            $examDifficultyLabel = match ($examDifficulty) {
+                                                'easy' => 'Easy',
+                                                'hard' => 'Hard',
+                                                default => 'Moderate',
+                                            };
+                                            $examQualityStatus = $questionQualityMetrics[$item->id]['quality_status']
+                                                ?? ($item->needs_revision ? 'flagged' : 'untested');
+                                        @endphp
+                                        <div
+                                            data-exam-question-option
+                                            data-topic-key="{{ $examTopicKey }}"
+                                            data-difficulty="{{ $examDifficulty }}"
+                                            data-quality-status="{{ $examQualityStatus }}"
+                                        >
+                                            <label class="exam-builder__question-card d-flex gap-3 align-items-start h-100 p-3">
+                                                <input
+                                                    class="form-check-input mt-1 js-exam-question"
+                                                    type="checkbox"
+                                                    name="question_bank_item_ids[]"
+                                                    value="{{ $item->id }}"
+                                                    @checked(in_array($item->id, (array) old('question_bank_item_ids', [])))
+                                                >
+                                                <span class="exam-builder__question-copy flex-grow-1">
+                                                    <span class="badge rounded-pill text-bg-light mb-2">{{ $examTopicName }}</span>
+                                                    <span class="badge rounded-pill {{ $examDifficulty === 'hard' ? 'text-bg-danger' : ($examDifficulty === 'easy' ? 'text-bg-success' : 'text-bg-warning') }} mb-2">{{ $examDifficultyLabel }}</span>
+                                                    <span class="exam-builder__question-text d-block fw-semibold">{{ $item->question }}</span>
+                                                    @if ($item->image_path)
+                                                        <img src="{{ asset('storage/'.$item->image_path) }}" alt="Question illustration" class="img-fluid rounded border mt-2" style="max-height: 7rem; object-fit: contain;">
+                                                    @endif
+                                                    <span class="small text-muted mt-2 d-block">{{ count($item->options ?? []) }} answer choices · {{ $item->author->name ?? 'Former Faculty' }}'s bank</span>
+                                                </span>
+                                            </label>
+                                        </div>
+                                    @endforeach
                                 </div>
                             </section>
                             <section aria-labelledby="exam-details-heading">
                                 <h3 class="h6 fw-bold mb-3 exam-builder__details-heading" id="exam-details-heading"><i class="bi bi-calendar2-week" aria-hidden="true"></i>Exam details and schedule</h3>
                                 <div class="row g-3">
-                                    <div class="col-md-6">
+                                    <div class="col-12">
                                         <label for="exam-title" class="form-label">Examination name</label>
                                         <input id="exam-title" name="title" value="{{ old('title') }}" class="form-control" maxlength="255" required>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="exam-topic" class="form-label">Subject or topic</label>
-                                        <input id="exam-topic" name="topic" value="{{ old('topic') }}" class="form-control" maxlength="255" required>
                                     </div>
                                     <div class="col-12">
                                         <label for="exam-description" class="form-label">Instructions <span class="text-muted">(optional)</span></label>
@@ -668,63 +810,182 @@
         updateClosingDateMinimum();
 
         const modalSelectedCount = document.getElementById('modal-selected-question-count');
+        const modalSelectedBreakdown = document.getElementById('modal-selected-question-breakdown');
         const selectionError = document.getElementById('question-selection-error');
-        const questionCheckboxes = Array.from(form.querySelectorAll('.js-exam-question'));
-        const questionCountInput = document.getElementById('question-count');
-        const randomSelection = document.getElementById('random-question-selection');
+        const questionOptions = Array.from(form.querySelectorAll('[data-exam-question-option]'));
+        const questionCheckboxes = questionOptions.map((option) => option.querySelector('.js-exam-question'));
+        const topicSelect = document.getElementById('auto-pick-topic');
+        const difficultySelect = document.getElementById('auto-pick-difficulty');
+        const autoPickCountInput = document.getElementById('auto-pick-count');
+        const autoPickButton = document.getElementById('auto-pick-questions');
+        const clearSelectionButton = document.getElementById('clear-exam-selection');
+        const autoPickStatus = document.getElementById('auto-pick-status');
+        const difficultyLabels = { easy: 'Easy', moderate: 'Moderate', hard: 'Hard' };
+        const qualityPriority = { healthy: 0, untested: 1, needs_review: 2, flagged: 3 };
+        const getSelectedQuestionCount = () => questionCheckboxes.filter((checkbox) => checkbox.checked).length;
+        const getMatchingQuestionOptions = () => questionOptions.filter((option) => {
+            const topicMatches = !topicSelect.value || option.dataset.topicKey === topicSelect.value;
+            const difficultyMatches = difficultySelect.value === 'all'
+                || option.dataset.difficulty === difficultySelect.value;
+
+            return topicMatches && difficultyMatches;
+        });
         const updateSelectedQuestionCount = () => {
-            const count = questionCheckboxes.filter((checkbox) => checkbox.checked).length;
-            const requestedCount = Number.parseInt(questionCountInput.value, 10) || 0;
-            const label = `${count} of ${requestedCount} selected`;
-            modalSelectedCount.textContent = label;
-            selectionError.hidden = true;
+            const selectedQuestions = questionCheckboxes.filter((checkbox) => checkbox.checked);
+            const breakdown = { easy: 0, moderate: 0, hard: 0 };
+            selectedQuestions.forEach((checkbox) => {
+                const difficulty = checkbox.closest('[data-exam-question-option]').dataset.difficulty;
+                if (Object.prototype.hasOwnProperty.call(breakdown, difficulty)) {
+                    breakdown[difficulty]++;
+                }
+            });
+            const difficultySummary = Object.entries(breakdown)
+                .filter(([, count]) => count > 0)
+                .map(([difficulty, count]) => `${difficultyLabels[difficulty]}: ${count}`);
+            modalSelectedCount.textContent = `${selectedQuestions.length} selected`;
+            modalSelectedBreakdown.textContent = difficultySummary.length > 0
+                ? difficultySummary.join(' · ')
+                : 'No questions selected yet';
+            clearSelectionButton.hidden = selectedQuestions.length === 0;
         };
-        const selectRandomQuestions = () => {
-            const requestedCount = Number.parseInt(questionCountInput.value, 10);
-            if (!questionCountInput.checkValidity() || !Number.isInteger(requestedCount) || requestedCount > questionCheckboxes.length) {
-                questionCountInput.reportValidity();
-                randomSelection.checked = false;
+        const updateQuestionFilters = () => {
+            const matchingOptions = getMatchingQuestionOptions();
+            const maxPickCount = Math.min(100, matchingOptions.length);
+            const matchingOptionSet = new Set(matchingOptions);
+            questionOptions.forEach((option) => {
+                option.hidden = !matchingOptionSet.has(option);
+            });
+
+            if (maxPickCount === 0) {
+                autoPickCountInput.min = '0';
+                autoPickCountInput.max = '0';
+                autoPickCountInput.value = '0';
+                autoPickCountInput.disabled = true;
+                autoPickButton.disabled = true;
+                autoPickStatus.textContent = 'No enabled questions match these filters.';
+
                 return;
             }
 
-            const shuffledQuestions = [...questionCheckboxes];
-            for (let index = shuffledQuestions.length - 1; index > 0; index--) {
+            autoPickCountInput.min = '1';
+            autoPickCountInput.max = String(maxPickCount);
+            autoPickCountInput.disabled = false;
+            const requestedCount = Number.parseInt(autoPickCountInput.value, 10);
+            if (!Number.isInteger(requestedCount) || requestedCount < 1) {
+                autoPickCountInput.value = String(Math.min(5, maxPickCount));
+            } else if (requestedCount > maxPickCount) {
+                autoPickCountInput.value = String(maxPickCount);
+            }
+            autoPickButton.disabled = false;
+            autoPickStatus.textContent = '';
+        };
+        const shuffle = (items) => {
+            const shuffledItems = [...items];
+            for (let index = shuffledItems.length - 1; index > 0; index--) {
                 const randomIndex = Math.floor(Math.random() * (index + 1));
-                [shuffledQuestions[index], shuffledQuestions[randomIndex]] = [shuffledQuestions[randomIndex], shuffledQuestions[index]];
+                [shuffledItems[index], shuffledItems[randomIndex]] = [shuffledItems[randomIndex], shuffledItems[index]];
             }
 
-            questionCheckboxes.forEach((checkbox) => {
-                checkbox.checked = false;
+            return shuffledItems;
+        };
+        const autoPickQuestions = () => {
+            const requestedCount = Number.parseInt(autoPickCountInput.value, 10);
+            if (
+                !autoPickCountInput.checkValidity()
+                || !Number.isInteger(requestedCount)
+                || requestedCount < 1
+            ) {
+                autoPickCountInput.reportValidity();
+                return;
+            }
+
+            const matchingOptions = getMatchingQuestionOptions();
+            const matchingSelectedCount = matchingOptions.filter((option) => option.querySelector('.js-exam-question').checked).length;
+            const requestedAdditionalCount = Math.max(0, requestedCount - matchingSelectedCount);
+            const unselectedOptions = matchingOptions.filter((option) => !option.querySelector('.js-exam-question').checked);
+            const candidatesByQuality = new Map();
+            unselectedOptions.forEach((option) => {
+                const status = option.dataset.qualityStatus || 'untested';
+                if (!candidatesByQuality.has(status)) {
+                    candidatesByQuality.set(status, []);
+                }
+                candidatesByQuality.get(status).push(option);
             });
-            shuffledQuestions.slice(0, requestedCount).forEach((checkbox) => {
-                checkbox.checked = true;
+            const prioritizedCandidates = [...candidatesByQuality.entries()]
+                .sort(([left], [right]) => (qualityPriority[left] ?? 1) - (qualityPriority[right] ?? 1))
+                .flatMap(([, candidates]) => shuffle(candidates));
+            const remainingExamCapacity = Math.max(0, 100 - getSelectedQuestionCount());
+            const questionsToPick = Math.min(
+                requestedAdditionalCount,
+                prioritizedCandidates.length,
+                remainingExamCapacity,
+            );
+
+            if (questionsToPick === 0) {
+                autoPickStatus.textContent = requestedAdditionalCount === 0
+                    ? 'The requested number for this filter is already selected.'
+                    : 'Exams can include up to 100 questions. Clear or deselect questions before adding more.';
+
+                return;
+            }
+
+            prioritizedCandidates.slice(0, questionsToPick).forEach((option) => {
+                option.querySelector('.js-exam-question').checked = true;
             });
+            selectionError.hidden = true;
             updateSelectedQuestionCount();
+            autoPickStatus.textContent = questionsToPick < requestedAdditionalCount
+                ? `Added ${questionsToPick} question${questionsToPick === 1 ? '' : 's'}; the exam limit is 100 questions.`
+                : `Added ${questionsToPick} question${questionsToPick === 1 ? '' : 's'}. Existing selections were kept.`;
         };
 
         questionCheckboxes.forEach((checkbox) => checkbox.addEventListener('change', () => {
-            randomSelection.checked = false;
-            updateSelectedQuestionCount();
-        }));
-        questionCountInput.addEventListener('input', () => {
-            if (randomSelection.checked) {
-                selectRandomQuestions();
+            if (checkbox.checked && getSelectedQuestionCount() > 100) {
+                checkbox.checked = false;
+                selectionError.textContent = 'Exams can include up to 100 questions.';
+                selectionError.hidden = false;
+
                 return;
             }
+            selectionError.hidden = true;
+            autoPickStatus.textContent = '';
+            updateSelectedQuestionCount();
+        }));
+        topicSelect.addEventListener('change', updateQuestionFilters);
+        difficultySelect.addEventListener('change', updateQuestionFilters);
+        autoPickCountInput.addEventListener('input', () => {
+            const maxPickCount = Number.parseInt(autoPickCountInput.max, 10) || 0;
+            let requestedCount = Number.parseInt(autoPickCountInput.value, 10);
+            if (Number.isInteger(requestedCount) && requestedCount > maxPickCount) {
+                requestedCount = maxPickCount;
+                autoPickCountInput.value = String(maxPickCount);
+            }
+            autoPickButton.disabled = maxPickCount === 0 || !Number.isInteger(requestedCount) || requestedCount < 1;
+            autoPickStatus.textContent = '';
+        });
+        autoPickButton.addEventListener('click', autoPickQuestions);
+        clearSelectionButton.addEventListener('click', () => {
+            questionCheckboxes.forEach((checkbox) => {
+                checkbox.checked = false;
+            });
+            selectionError.hidden = true;
+            autoPickStatus.textContent = 'Selection cleared.';
             updateSelectedQuestionCount();
         });
-        randomSelection.addEventListener('change', () => {
-            if (randomSelection.checked) {
-                selectRandomQuestions();
-            }
-        });
         form.addEventListener('submit', (event) => {
-            const requestedCount = Number.parseInt(questionCountInput.value, 10);
-            const count = questionCheckboxes.filter((checkbox) => checkbox.checked).length;
-            if (count !== requestedCount) {
+            const selectedCount = getSelectedQuestionCount();
+            if (selectedCount === 0) {
                 event.preventDefault();
+                selectionError.textContent = 'Select at least one question or use Auto-Pick.';
                 selectionError.hidden = false;
-                (questionCheckboxes.find((checkbox) => !checkbox.checked) ?? questionCountInput).focus();
+                questionOptions.find((option) => !option.hidden)?.querySelector('.js-exam-question')?.focus();
+                return;
+            }
+
+            if (selectedCount > 100) {
+                event.preventDefault();
+                selectionError.textContent = 'Exams can include up to 100 questions.';
+                selectionError.hidden = false;
                 return;
             }
 
@@ -737,6 +998,7 @@
 
         });
         closesAtInput.addEventListener('input', () => closesAtInput.setCustomValidity(''));
+        updateQuestionFilters();
         updateSelectedQuestionCount();
     });
 </script>

@@ -10,9 +10,11 @@ use App\Models\Test;
 use App\Models\User;
 use App\Notifications\FacultyExamApprovalDecisionNotification;
 use App\Notifications\FacultyExamApprovalRequestedNotification;
+use App\Services\QuestionBankQualityAnalyzer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
@@ -20,6 +22,8 @@ use Illuminate\View\View;
 
 class TestController extends Controller
 {
+    public function __construct(private QuestionBankQualityAnalyzer $qualityAnalyzer) {}
+
     public function index(Request $request): View
     {
         $user = $request->user();
@@ -124,16 +128,56 @@ class TestController extends Controller
             ? QuestionBankItem::query()
                 ->where('course_id', $selectedCourseId)
                 ->where('is_active', true)
-                ->with(['course:id,name,department_id', 'author:id,name', 'subtopic:id,title'])
+                ->with([
+                    'course:id,name,department_id',
+                    'author:id,name',
+                    'subtopic:id,title',
+                    'topicRecord:id,name',
+                ])
                 ->orderBy('topic')
                 ->orderBy('id')
                 ->get()
             : collect();
+        $questionBankTopics = $questionBankItems
+            ->groupBy(static function (QuestionBankItem $item): string {
+                $topicName = trim((string) ($item->topicRecord?->name ?? $item->topic ?? 'General'));
+
+                return mb_strtolower($topicName, 'UTF-8');
+            })
+            ->map(static function (Collection $items, string $topicKey): array {
+                $firstItem = $items->first();
+
+                return [
+                    'key' => $topicKey,
+                    'name' => trim((string) ($firstItem->topicRecord?->name ?? $firstItem->topic ?? 'General')),
+                    'count' => $items->count(),
+                ];
+            })
+            ->sortBy(static fn (array $topic): string => mb_strtolower($topic['name'], 'UTF-8'))
+            ->values();
+        $difficultyCounts = $questionBankItems->countBy(static function (QuestionBankItem $item): string {
+            $difficulty = strtolower((string) ($item->difficulty ?? 'moderate'));
+
+            return in_array($difficulty, ['easy', 'hard'], true) ? $difficulty : 'moderate';
+        });
+        $totalQuestions = $questionBankItems->count();
+        $topicsCount = $questionBankTopics->count();
+        $easyCount = $difficultyCounts->get('easy', 0);
+        $moderateCount = $difficultyCounts->get('moderate', 0);
+        $hardCount = $difficultyCounts->get('hard', 0);
+        $questionQualityMetrics = $this->qualityAnalyzer->analyze($questionBankItems);
 
         return view('admin.tests.create', compact(
             'courses',
             'departments',
             'questionBankItems',
+            'questionBankTopics',
+            'questionQualityMetrics',
+            'totalQuestions',
+            'topicsCount',
+            'easyCount',
+            'moderateCount',
+            'hardCount',
             'selectedCourseId',
             'selectedDepartmentId',
         ));
@@ -147,21 +191,14 @@ class TestController extends Controller
         $validationRules = [
             'course_id' => ['required', 'integer', 'exists:courses,id'],
             'title' => ['required', 'string', 'max:255'],
-            'topic' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'available_from' => ['required', 'date'],
             'available_until' => ['nullable', 'date', 'after:available_from'],
             'time_limit' => ['required', 'integer', 'min:1', 'max:300'],
-            'question_count' => ['required', 'integer', 'min:1', 'max:100'],
             'question_bank_item_ids' => ['required', 'array', 'min:1', 'max:100'],
             'question_bank_item_ids.*' => ['required', 'integer', 'distinct', 'exists:question_bank_items,id'],
         ];
         $validated = $request->validate($validationRules);
-        if (count($validated['question_bank_item_ids']) !== (int) $validated['question_count']) {
-            return back()
-                ->withErrors(['question_bank_item_ids' => 'Select exactly the number of questions you entered.'])
-                ->withInput();
-        }
 
         $course = Course::query()->findOrFail($validated['course_id']);
         abort_if(
@@ -171,6 +208,7 @@ class TestController extends Controller
         $items = QuestionBankItem::query()
             ->where('course_id', $course->id)
             ->whereIn('id', $validated['question_bank_item_ids'])
+            ->with('topicRecord:id,name')
             ->get();
         if ($items->count() !== count($validated['question_bank_item_ids'])) {
             abort(404);
@@ -180,6 +218,15 @@ class TestController extends Controller
                 'question_bank_item_ids' => 'One or more selected questions are disabled and cannot be added to an examination.',
             ]);
         }
+        $topicLabel = $items
+            ->map(static fn (QuestionBankItem $item): string => trim((string) (
+                $item->topicRecord?->name ?? $item->topic ?? 'General'
+            )))
+            ->filter()
+            ->unique(static fn (string $topicName): string => mb_strtolower($topicName, 'UTF-8'))
+            ->sortBy(static fn (string $topicName): string => mb_strtolower($topicName, 'UTF-8'))
+            ->implode(', ');
+        $topicLabel = $topicLabel !== '' ? $topicLabel : 'General';
         $items = $items->shuffle();
 
         $startsAt = Carbon::parse($validated['available_from']);
@@ -188,11 +235,11 @@ class TestController extends Controller
             : null;
 
         $isFacultyRequest = $creator->role === 'admin';
-        $test = DB::transaction(function () use ($creator, $course, $validated, $items, $startsAt, $closesAt, $isFacultyRequest): Test {
+        $test = DB::transaction(function () use ($creator, $course, $validated, $items, $topicLabel, $startsAt, $closesAt, $isFacultyRequest): Test {
             $test = Test::create([
                 'title' => $validated['title'],
                 'description' => $validated['description'] ?? null,
-                'topic' => $validated['topic'],
+                'topic' => $topicLabel,
                 'time_limit' => (int) $validated['time_limit'],
                 'duration_minutes' => (int) $validated['time_limit'],
                 'department_id' => $course->department_id,
@@ -219,7 +266,7 @@ class TestController extends Controller
                     'options' => $item->options,
                     'correct_answer' => $item->correct_answer,
                     'explanation' => $item->explanation,
-                    'topic' => $item->topic ?? $validated['topic'],
+                    'topic' => $item->topic ?: ($item->topicRecord?->name ?? 'General'),
                     'image_path' => $item->image_path,
                     'difficulty' => $item->difficulty ?? 'moderate',
                 ]);
