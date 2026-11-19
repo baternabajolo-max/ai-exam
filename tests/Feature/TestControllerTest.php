@@ -387,15 +387,24 @@ class TestControllerTest extends TestCase
 
         $this->actingAs($faculty)
             ->get(route('admin.tests.index'))
-            ->assertSee('Software Engineering exam 1')
-            ->assertSee('Computer Science exam')
-            ->assertSee('Information Systems exam')
+            ->assertSee('Software Engineering exam 11')
+            ->assertDontSee('Computer Science exam')
+            ->assertDontSee('Information Systems exam')
+            ->assertDontSee('Program: Software Engineering')
             ->assertDontSee('Other college exam')
+            ->assertDontSee('College: Computing')
             ->assertSee('All programs in your college')
             ->assertSee(route('admin.tests.index', ['view_all' => 1]), false);
 
+        $this->get(route('admin.tests.index', ['view_all' => 1]))
+            ->assertSee('Computer Science exam')
+            ->assertSee('Information Systems exam')
+            ->assertDontSee('Program: Computer Science')
+            ->assertDontSee('Program: Information Systems')
+            ->assertDontSee('College: Computing');
+
         $this->get(route('admin.tests.index', ['course_id' => $firstCourse->id]))
-            ->assertSee('Software Engineering exam 1')
+            ->assertSee('Software Engineering exam 11')
             ->assertDontSee('Computer Science exam')
             ->assertDontSee('Information Systems exam')
             ->assertDontSee('Other college exam')
@@ -406,6 +415,114 @@ class TestControllerTest extends TestCase
             ->assertSee('Information Systems exam')
             ->assertDontSee('Software Engineering exam 1')
             ->assertViewHas('tests', fn ($tests): bool => $tests->total() === 1);
+    }
+
+    public function test_super_admin_exam_schedule_orders_exams_by_college_and_program(): void
+    {
+        $computing = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $softwareEngineering = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $computing->id]);
+        $computerScience = Course::create(['name' => 'Computer Science', 'code' => 'CS', 'department_id' => $computing->id]);
+        $education = Department::create(['name' => 'Education', 'code' => 'EDU']);
+        $teaching = Course::create(['name' => 'Teaching', 'code' => 'TEACH', 'department_id' => $education->id]);
+        $admin = User::factory()->create(['role' => 'super-admin']);
+
+        foreach ([
+            [$computing, $softwareEngineering, 'Computing examination'],
+            [$computing, $computerScience, 'Computer Science examination'],
+            [$education, $teaching, 'Education examination'],
+        ] as [$department, $course, $title]) {
+            Exam::create([
+                'title' => $title,
+                'topic' => 'Topic',
+                'department_id' => $department->id,
+                'course_id' => $course->id,
+                'created_by' => $admin->id,
+                'is_general' => false,
+                'is_scheduled_exam' => true,
+                'is_published' => true,
+                'available_from' => now()->addDay(),
+            ]);
+        }
+
+        $this->actingAs($admin)
+            ->get(route('super-admin.tests.index'))
+            ->assertDontSee('College:')
+            ->assertDontSee('Program:')
+            ->assertViewHas('tests', fn ($tests): bool => $tests->getCollection()->pluck('title')->all() === [
+                'Computing examination',
+                'Computer Science examination',
+                'Education examination',
+            ]);
+    }
+
+    public function test_super_admin_can_filter_exams_by_college_then_program(): void
+    {
+        $computing = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $softwareEngineering = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $computing->id]);
+        $computerScience = Course::create(['name' => 'Computer Science', 'code' => 'CS', 'department_id' => $computing->id]);
+        $education = Department::create(['name' => 'Education', 'code' => 'EDU']);
+        $teaching = Course::create(['name' => 'Teaching', 'code' => 'TEACH', 'department_id' => $education->id]);
+        $admin = User::factory()->create(['role' => 'super-admin']);
+
+        foreach ([
+            [$computing, $softwareEngineering, 'Software Engineering examination'],
+            [$computing, $computerScience, 'Computer Science examination'],
+            [$education, $teaching, 'Teaching examination'],
+        ] as [$department, $course, $title]) {
+            Exam::create([
+                'title' => $title,
+                'topic' => 'Topic',
+                'department_id' => $department->id,
+                'course_id' => $course->id,
+                'created_by' => $admin->id,
+                'is_general' => false,
+                'is_scheduled_exam' => true,
+                'is_published' => true,
+                'available_from' => now()->addDay(),
+            ]);
+        }
+
+        $unfilteredResponse = $this->actingAs($admin)
+            ->get(route('super-admin.tests.index'))
+            ->assertSee('id="exam-college-filter"', false)
+            ->assertSee('id="exam-program-filter"', false)
+            ->assertSee('All colleges')
+            ->assertSee('Choose a college first')
+            ->assertDontSee('Software Engineering</option>', false);
+
+        $this->assertSame(
+            1,
+            preg_match('/<select(?=[^>]*\bid="exam-program-filter")(?=[^>]*\bdisabled\b)[^>]*>/', $unfilteredResponse->getContent()),
+        );
+
+        $collegeResponse = $this->get(route('super-admin.tests.index', ['department_id' => $computing->id]))
+            ->assertSee('Software Engineering</option>', false)
+            ->assertSee('Computer Science</option>', false)
+            ->assertDontSee('Teaching</option>', false)
+            ->assertViewHas('tests', fn ($tests): bool => $tests->total() === 2);
+
+        $this->assertSame(
+            0,
+            preg_match('/<select(?=[^>]*\bid="exam-program-filter")(?=[^>]*\bdisabled\b)[^>]*>/', $collegeResponse->getContent()),
+        );
+
+        $this->get(route('super-admin.tests.index', [
+            'department_id' => $computing->id,
+            'course_id' => $softwareEngineering->id,
+        ]))
+            ->assertSee('Software Engineering examination')
+            ->assertDontSee('Computer Science examination')
+            ->assertDontSee('Teaching examination')
+            ->assertViewHas('tests', fn ($tests): bool => $tests->total() === 1);
+
+        $this->get(route('super-admin.tests.index', ['course_id' => $softwareEngineering->id]))
+            ->assertNotFound();
+
+        $this->get(route('super-admin.tests.index', [
+            'department_id' => $education->id,
+            'course_id' => $softwareEngineering->id,
+        ]))
+            ->assertNotFound();
     }
 
     public function test_faculty_submits_an_exam_using_another_facultys_question_as_a_pending_read_only_snapshot(): void
@@ -895,6 +1012,13 @@ class TestControllerTest extends TestCase
         $this->assertSame('rejected', $facultyNotification->data['decision']);
         $this->assertSame('Examination Rejected', $facultyNotification->data['title']);
 
+        $this->get(route('super-admin.tests.index'))
+            ->assertViewHas('tests', fn ($tests): bool => $tests->isEmpty());
+
+        $this->actingAs($faculty)
+            ->get(route('admin.tests.index'))
+            ->assertViewHas('tests', fn ($tests): bool => $tests->isEmpty());
+
         $otherFaculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
         $this->actingAs($otherFaculty)
             ->post(route('admin.notifications.read', $facultyNotification->id))
@@ -902,7 +1026,7 @@ class TestControllerTest extends TestCase
         $this->assertNull($facultyNotification->fresh()->read_at);
     }
 
-    public function test_admin_rejection_comment_is_saved_and_visible_to_the_exam_creator(): void
+    public function test_admin_rejection_comment_is_saved_and_included_in_the_exam_creators_notification(): void
     {
         $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
         $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
@@ -936,8 +1060,7 @@ class TestControllerTest extends TestCase
 
         $this->actingAs($faculty)
             ->get(route('admin.tests.index'))
-            ->assertOk()
-            ->assertSee('Admin comment: '.$comment);
+            ->assertViewHas('tests', fn ($tests): bool => $tests->isEmpty());
     }
 
     public function test_examination_schedule_shows_ten_items_and_view_all_reveals_the_remaining_items(): void

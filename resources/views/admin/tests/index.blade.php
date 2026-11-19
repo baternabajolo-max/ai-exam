@@ -256,6 +256,18 @@
         width: min(100%, 17rem);
     }
 
+    .exam-list__table-tools form.exam-list__filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem;
+        width: auto;
+    }
+
+    .exam-list__filters .form-select {
+        min-width: 16rem;
+        width: 16rem;
+    }
+
     .exam-list__table-tools .form-select {
         min-height: 2.5rem;
     }
@@ -369,6 +381,16 @@
             width: 100%;
         }
 
+        .exam-list__table-tools,
+        .exam-list__table-tools form.exam-list__filters,
+        .exam-list__filters .form-select {
+            width: 100%;
+        }
+
+        .exam-list__filters .form-select {
+            min-width: 0;
+        }
+
         .exam-list__table {
             min-width: 0;
         }
@@ -377,7 +399,7 @@
             display: none;
         }
 
-        .exam-list__table tbody tr:not(:has(> td[colspan])) {
+        .exam-list__table tbody tr:not(:has(> td[colspan])):not(.exam-list__group-heading) {
             border-bottom: 1px solid #e2e8f0;
             display: grid;
             gap: .1rem;
@@ -612,8 +634,47 @@
                 </p>
             </div>
             <div class="exam-list__table-tools">
-                @if (auth()->user()->role === 'admin')
-                    <form method="GET" action="{{ route('admin.tests.index') }}">
+                @if ($groupByCollege)
+                    <form class="exam-list__filters" method="GET" action="{{ route('super-admin.tests.index') }}">
+                        @if ($showAll)
+                            <input type="hidden" name="view_all" value="1">
+                        @endif
+                        <label class="visually-hidden" for="exam-college-filter">Filter examinations by college</label>
+                        <select
+                            id="exam-college-filter"
+                            name="department_id"
+                            class="form-select form-select-sm"
+                            onchange="this.form.elements.course_id.value = ''; this.form.requestSubmit()"
+                        >
+                            <option value="">All colleges</option>
+                            @foreach ($departments as $department)
+                                <option value="{{ $department->id }}" @selected((string) $selectedDepartmentId === (string) $department->id)>{{ $department->name }}</option>
+                            @endforeach
+                        </select>
+                        <label class="visually-hidden" for="exam-program-filter">Filter examinations by program</label>
+                        <select
+                            id="exam-program-filter"
+                            name="course_id"
+                            class="form-select form-select-sm"
+                            @disabled($selectedDepartmentId === null)
+                            onchange="this.form.requestSubmit()"
+                        >
+                            @if ($selectedDepartmentId === null)
+                                <option value="">Choose a college first</option>
+                            @else
+                                <option value="">All programs</option>
+                                @foreach ($filterCourses as $course)
+                                    <option value="{{ $course->id }}" @selected((string) $selectedCourseId === (string) $course->id)>{{ $course->name }}</option>
+                                @endforeach
+                            @endif
+                        </select>
+                        <noscript><button class="btn btn-sm btn-outline-primary" type="submit">Apply filters</button></noscript>
+                    </form>
+                @elseif (auth()->user()->role === 'admin')
+                    <form class="exam-list__filters" method="GET" action="{{ route('admin.tests.index') }}">
+                        @if ($showAll)
+                            <input type="hidden" name="view_all" value="1">
+                        @endif
                         <label class="visually-hidden" for="exam-program-filter">Filter examinations by program</label>
                         <select
                             id="exam-program-filter"
@@ -626,7 +687,7 @@
                                 <option value="{{ $course->id }}" @selected((string) $selectedCourseId === (string) $course->id)>{{ $course->name }}</option>
                             @endforeach
                         </select>
-                        <noscript><button class="btn btn-sm btn-outline-primary mt-2" type="submit">Apply filter</button></noscript>
+                        <noscript><button class="btn btn-sm btn-outline-primary" type="submit">Apply filter</button></noscript>
                     </form>
                 @endif
                 @if ($tests->total() > 10)
@@ -634,6 +695,7 @@
                         class="btn btn-sm btn-outline-primary rounded-pill px-3"
                         href="{{ route($testRoutePrefix.'.tests.index', array_filter([
                             'view_all' => $showAll ? null : 1,
+                            'department_id' => $selectedDepartmentId,
                             'course_id' => $selectedCourseId,
                         ], fn ($value) => $value !== null)) }}"
                     >

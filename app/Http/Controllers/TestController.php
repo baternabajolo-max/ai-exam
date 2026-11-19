@@ -29,12 +29,34 @@ class TestController extends Controller
         $user = $request->user();
         $request->validate([
             'view_all' => ['sometimes', 'boolean'],
+            'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'course_id' => ['nullable', 'integer', 'exists:courses,id'],
         ]);
         $showAll = $request->boolean('view_all');
+        $groupByCollege = $user->role === 'super-admin';
         $facultyCourses = collect();
+        $departments = collect();
+        $filterCourses = collect();
+        $selectedDepartmentId = null;
         $selectedCourseId = null;
-        if ($user->role === 'admin' && $user->department_id !== null) {
+        if ($groupByCollege) {
+            $departments = Department::query()
+                ->orderBy('name')
+                ->get(['id', 'name']);
+            if ($request->filled('department_id')) {
+                $selectedDepartmentId = $request->integer('department_id');
+                abort_unless($departments->contains('id', $selectedDepartmentId), 404);
+                $filterCourses = Course::query()
+                    ->where('department_id', $selectedDepartmentId)
+                    ->orderBy('name')
+                    ->get(['id', 'name']);
+            }
+            if ($request->filled('course_id')) {
+                abort_unless($selectedDepartmentId !== null, 404);
+                $selectedCourseId = $request->integer('course_id');
+                abort_unless($filterCourses->contains('id', $selectedCourseId), 404);
+            }
+        } elseif ($user->role === 'admin' && $user->department_id !== null) {
             $facultyCourses = Course::query()
                 ->where('department_id', $user->department_id)
                 ->orderBy('name')
@@ -46,15 +68,23 @@ class TestController extends Controller
         }
         $testsQuery = Test::query()
             ->where('is_scheduled_exam', true)
+            ->where(fn ($query) => $query
+                ->whereNull('approval_status')
+                ->orWhere('approval_status', '!=', Test::APPROVAL_STATUS_REJECTED))
+            ->when($groupByCollege && $selectedDepartmentId !== null, fn ($query) => $query
+                ->where('department_id', $selectedDepartmentId))
+            ->when($selectedCourseId !== null, fn ($query) => $query->where('course_id', $selectedCourseId))
             ->when($user->role === 'admin', fn ($query) => $query
                 ->whereIn('course_id', $facultyCourses->pluck('id'))
-                ->when($selectedCourseId !== null, fn ($query) => $query->where('course_id', $selectedCourseId))
                 ->where(fn ($query) => $query
                     ->where(fn ($query) => $query
                         ->where('approval_status', 'approved')
                         ->where('is_published', true))
                     ->orWhere('created_by', $user->id)))
-            ->latest('available_from');
+            ->when($groupByCollege, fn ($query) => $query->orderBy('department_id'))
+            ->orderBy('course_id')
+            ->latest('available_from')
+            ->orderByDesc('id');
         $totalTests = (clone $testsQuery)->count();
         $pageSize = $showAll ? max(10, $totalTests) : 10;
         $tests = $testsQuery
@@ -68,7 +98,16 @@ class TestController extends Controller
             ->paginate($pageSize)
             ->withQueryString();
 
-        return view('admin.tests.index', compact('tests', 'showAll', 'facultyCourses', 'selectedCourseId'));
+        return view('admin.tests.index', compact(
+            'tests',
+            'showAll',
+            'groupByCollege',
+            'departments',
+            'filterCourses',
+            'selectedDepartmentId',
+            'facultyCourses',
+            'selectedCourseId',
+        ));
     }
 
     public function create(Request $request): View
