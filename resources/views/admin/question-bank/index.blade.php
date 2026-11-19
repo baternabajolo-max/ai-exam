@@ -189,6 +189,39 @@
         color: #166534;
     }
 
+    .faculty-question-bank__metric-card {
+        background: var(--bs-tertiary-bg);
+        border: 1px solid var(--bs-border-color);
+        border-radius: .85rem;
+        min-height: 7.25rem;
+        padding: 1rem;
+    }
+
+    .faculty-question-bank__metric-info {
+        align-items: center;
+        background: transparent;
+        border: 0;
+        border-radius: 50%;
+        color: var(--bs-secondary-color);
+        display: inline-flex;
+        flex: 0 0 1.75rem;
+        height: 1.75rem;
+        justify-content: center;
+        padding: 0;
+        width: 1.75rem;
+    }
+
+    .faculty-question-bank__metric-info:hover,
+    .faculty-question-bank__metric-info:focus-visible {
+        background: var(--bs-secondary-bg);
+        color: var(--bs-primary);
+        outline: 0;
+    }
+
+    .faculty-question-bank__metric-info:focus-visible {
+        box-shadow: 0 0 0 .2rem rgb(99 102 241 / 20%);
+    }
+
     .faculty-question-bank__preview-letter {
         align-items: center;
         background: #f1f5f9;
@@ -338,8 +371,8 @@
     }
 
     @keyframes question-bank-fade-in {
-        from { opacity: 0; transform: translateY(4px); }
-        to { opacity: 1; transform: translateY(0); }
+        from { opacity: 0; }
+        to { opacity: 1; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -757,7 +790,7 @@
                     {{ $readOnly ? 'Questions are shared across Faculty in this program. Disabled questions cannot be added to future exams.' : 'Questions are shared across Faculty in this program. You can edit or remove only questions you created.' }}
                 </p>
             </div>
-            <div class="d-flex align-items-center gap-3">
+            <div class="d-flex flex-wrap align-items-center gap-2">
                 @if ($selectedTopic !== null)
                     <span class="badge rounded-pill text-bg-light border px-3 py-2">{{ $items->total() }} total</span>
                     <div class="dropdown">
@@ -776,19 +809,85 @@
                             <li>
                                 <a
                                     class="dropdown-item {{ $selectedDifficulty === null ? 'active' : '' }}"
-                                    href="{{ $readOnly
-                                        ? route('super-admin.question-bank.index', ['department_id' => $selectedDepartmentId, 'course_id' => $course->id, 'topic_id' => $selectedTopic->id])
-                                        : route('admin.question-bank.topics.show', ['topic' => $selectedTopic->id]) }}"
+                                    href="{{ route(
+                                        $readOnly ? 'super-admin.question-bank.index' : 'admin.question-bank.topics.show',
+                                        array_filter([
+                                            'department_id' => $readOnly ? $selectedDepartmentId : null,
+                                            'course_id' => $readOnly ? $course->id : null,
+                                            'topic_id' => $readOnly ? $selectedTopic->id : null,
+                                            'topic' => $readOnly ? null : $selectedTopic->id,
+                                            'health' => $selectedHealth === 'all' ? null : $selectedHealth,
+                                        ])
+                                    ) }}"
                                 >All difficulties</a>
                             </li>
                             @foreach (['easy' => 'Easy', 'medium' => 'Moderate', 'hard' => 'Hard'] as $value => $label)
                                 <li>
                                     <a
                                         class="dropdown-item {{ $selectedDifficulty === $value ? 'active' : '' }}"
-                                        href="{{ $readOnly
-                                            ? route('super-admin.question-bank.index', ['department_id' => $selectedDepartmentId, 'course_id' => $course->id, 'topic_id' => $selectedTopic->id, 'difficulty' => $value])
-                                            : route('admin.question-bank.topics.show', ['topic' => $selectedTopic->id, 'difficulty' => $value]) }}"
+                                        href="{{ route(
+                                            $readOnly ? 'super-admin.question-bank.index' : 'admin.question-bank.topics.show',
+                                            array_filter([
+                                                'department_id' => $readOnly ? $selectedDepartmentId : null,
+                                                'course_id' => $readOnly ? $course->id : null,
+                                                'topic_id' => $readOnly ? $selectedTopic->id : null,
+                                                'topic' => $readOnly ? null : $selectedTopic->id,
+                                                'difficulty' => $value,
+                                                'health' => $selectedHealth === 'all' ? null : $selectedHealth,
+                                            ])
+                                        ) }}"
                                     >{{ $label }}</a>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                    <div class="dropdown">
+                        <button
+                            class="btn btn-outline-secondary rounded-pill px-3"
+                            type="button"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false"
+                            aria-label="Filter questions by health status"
+                            title="Filter questions by health status"
+                        >
+                            <i class="bi {{ match ($selectedHealth) {
+                                'healthy' => 'bi-check-circle',
+                                'needs_review' => 'bi-exclamation-triangle',
+                                'flagged' => 'bi-flag-fill',
+                                'untested' => 'bi-question-circle',
+                                default => 'bi-heart-pulse',
+                            } }} me-1" aria-hidden="true"></i>
+                            {{ $selectedHealth === 'all' ? 'All Health' : match ($selectedHealth) {
+                                'healthy' => 'Healthy',
+                                'needs_review' => 'Needs Review',
+                                'flagged' => 'Flagged',
+                                'untested' => 'Untested',
+                                default => 'Health',
+                            } }}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                            @foreach ([
+                                'all' => 'All Health',
+                                'healthy' => 'Healthy',
+                                'needs_review' => 'Needs Review',
+                                'flagged' => 'Flagged',
+                                'untested' => 'Untested',
+                            ] as $healthValue => $healthLabel)
+                                <li>
+                                    <a
+                                        class="dropdown-item {{ $selectedHealth === $healthValue ? 'active' : '' }}"
+                                        href="{{ route(
+                                            $readOnly ? 'super-admin.question-bank.index' : 'admin.question-bank.topics.show',
+                                            array_filter([
+                                                'department_id' => $readOnly ? $selectedDepartmentId : null,
+                                                'course_id' => $readOnly ? $course->id : null,
+                                                'topic_id' => $readOnly ? $selectedTopic->id : null,
+                                                'topic' => $readOnly ? null : $selectedTopic->id,
+                                                'difficulty' => $selectedDifficulty,
+                                                'health' => $healthValue === 'all' ? null : $healthValue,
+                                            ])
+                                        ) }}"
+                                    >{{ $healthLabel }}</a>
                                 </li>
                             @endforeach
                         </ul>
@@ -804,15 +903,48 @@
 
         <div class="faculty-question-bank__question-grid">
         @forelse ($items as $item)
-            @php($canManageQuestion = ! $readOnly && $item->author_id === auth()->id())
-            <article class="faculty-question-bank__question mb-3">
+            @php
+                $canManageQuestion = ! $readOnly && $item->author_id === auth()->id();
+                $canFlagQuestion = $canFlagQuestions
+                    && (int) $item->author_id !== (int) auth()->id();
+                $questionMetrics = $questionQualityMetrics[$item->id] ?? [
+                    'total_responses' => 0,
+                    'correct_responses' => 0,
+                    'pass_rate' => null,
+                    'usage_count' => 0,
+                    'last_used_at' => null,
+                    'choice_breakdown' => [],
+                    'quality_status' => $item->needs_revision ? 'flagged' : 'untested',
+                    'unflagged_quality_status' => 'untested',
+                    'is_easy_miscalibrated' => false,
+                ];
+                $qualityLabel = match ($questionMetrics['quality_status']) {
+                    'healthy' => 'Healthy',
+                    'needs_review' => 'Needs Review',
+                    'flagged' => 'Flagged',
+                    default => 'Untested',
+                };
+                $qualityBadgeClass = match ($questionMetrics['quality_status']) {
+                    'healthy' => 'text-bg-success',
+                    'needs_review' => 'text-bg-warning',
+                    'flagged' => 'text-bg-danger',
+                    default => 'text-bg-secondary',
+                };
+            @endphp
+            <article class="faculty-question-bank__question mb-3" data-question-card="{{ $item->id }}">
                 <div class="d-flex align-items-center justify-content-between gap-3 p-3 p-md-4">
                     <div class="d-flex align-items-start gap-3">
                         <span class="faculty-question-bank__question-number" aria-hidden="true"><i class="bi bi-patch-question"></i></span>
                         <div>
                             <span class="badge rounded-pill text-bg-light mb-2">{{ $selectedTopic->name }}</span>
-                            <div class="small text-muted mb-1">Added by {{ $item->author?->name ?? 'Former Faculty' }}</div>
+                            <div class="small text-muted mb-1">Added by: {{ $item->author?->name ?: 'Faculty' }}</div>
                             <span class="badge rounded-pill {{ $item->difficulty === 'hard' ? 'text-bg-danger' : ($item->difficulty === 'easy' ? 'text-bg-success' : 'text-bg-warning') }} mb-2">{{ $item->difficulty === 'medium' ? 'Moderate' : ucfirst($item->difficulty ?? 'moderate') }}</span>
+                            <span
+                                id="question-health-status-{{ $item->id }}"
+                                class="badge rounded-pill {{ $qualityBadgeClass }} mb-2"
+                                data-quality-status="{{ $questionMetrics['quality_status'] }}"
+                                data-unflagged-quality-status="{{ $questionMetrics['unflagged_quality_status'] }}"
+                            >{{ $qualityLabel }}</span>
                             <span class="badge rounded-pill {{ $item->is_active ? 'text-bg-success' : 'text-bg-secondary' }} mb-2">{{ $item->is_active ? 'Enabled' : 'Disabled' }} for new exams</span>
                             <h3 class="faculty-question-bank__question-text h6 fw-semibold text-break mb-1">{{ $item->question }}</h3>
                             @if ($item->image_path)
@@ -850,7 +982,7 @@
             </article>
 
             <div class="modal fade" id="viewQuestionModal{{ $item->id }}" tabindex="-1" aria-labelledby="viewQuestionModalLabel{{ $item->id }}" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                     <div class="modal-content border-0 shadow-lg faculty-question-bank__preview-modal">
                         <div class="modal-header">
                             <div>
@@ -863,7 +995,10 @@
                             <div class="faculty-question-bank__preview-question mb-3">
                                 <div class="small text-uppercase text-muted fw-bold mb-2">Prompt</div>
                                 <h3 class="h6 fw-semibold text-break mb-0">{{ $item->question }}</h3>
-                                <div class="mt-2"><span class="badge rounded-pill {{ $item->difficulty === 'hard' ? 'text-bg-danger' : ($item->difficulty === 'easy' ? 'text-bg-success' : 'text-bg-warning') }}">{{ $item->difficulty === 'medium' ? 'Moderate' : ucfirst($item->difficulty ?? 'moderate') }} difficulty</span></div>
+                                <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
+                                    <span class="badge rounded-pill {{ $item->difficulty === 'hard' ? 'text-bg-danger' : ($item->difficulty === 'easy' ? 'text-bg-success' : 'text-bg-warning') }}">{{ $item->difficulty === 'medium' ? 'Moderate' : ucfirst($item->difficulty ?? 'moderate') }} difficulty</span>
+                                    <span class="small text-muted">Added by: {{ $item->author?->name ?: 'Faculty' }}</span>
+                                </div>
                                 @if ($item->image_path)
                                     <img src="{{ asset('storage/'.$item->image_path) }}" alt="Question illustration" class="img-fluid rounded border mt-3">
                                 @endif
@@ -871,31 +1006,164 @@
                                     <p class="small text-muted mt-3 mb-0"><strong>Explanation:</strong> {{ $item->explanation }}</p>
                                 @endif
                             </div>
+                            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 mb-4">
+                                <div class="col">
+                                    <section class="faculty-question-bank__metric-card h-100">
+                                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                                            <h3 class="small fw-semibold mb-0">Quality Status</h3>
+                                            <button
+                                                class="faculty-question-bank__metric-info"
+                                                type="button"
+                                                aria-label="Quality Status information"
+                                                data-question-metric-tooltip
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                data-bs-title="Automatically classifies the question as Healthy, Needs Review (pass rate &lt; 40% or an unused distractor), Flagged (manually marked for editing), or Untested."
+                                            ><i class="bi bi-info-circle" aria-hidden="true"></i></button>
+                                        </div>
+                                        <span
+                                            class="badge rounded-pill {{ $qualityBadgeClass }}"
+                                            data-quality-status-pill
+                                            data-quality-status="{{ $questionMetrics['quality_status'] }}"
+                                            data-unflagged-quality-status="{{ $questionMetrics['unflagged_quality_status'] }}"
+                                        >{{ $qualityLabel }}</span>
+                                    </section>
+                                </div>
+                                <div class="col">
+                                    <section class="faculty-question-bank__metric-card h-100">
+                                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                                            <h3 class="small fw-semibold mb-0">Student Pass Rate</h3>
+                                            <button
+                                                class="faculty-question-bank__metric-info"
+                                                type="button"
+                                                aria-label="Student Pass Rate information"
+                                                data-question-metric-tooltip
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                data-bs-title="Combines all student responses across every exam and quiz where this question appeared to show its true pass percentage."
+                                            ><i class="bi bi-info-circle" aria-hidden="true"></i></button>
+                                        </div>
+                                        @if ($questionMetrics['total_responses'] === 0)
+                                            <div class="small fw-semibold text-muted">0 responses yet</div>
+                                        @else
+                                            <div class="small fw-semibold tabular-nums">
+                                                {{ number_format((float) $questionMetrics['pass_rate'], 1) }}%
+                                                <span class="text-muted fw-normal">({{ $questionMetrics['correct_responses'] }}/{{ $questionMetrics['total_responses'] }})</span>
+                                            </div>
+                                        @endif
+                                    </section>
+                                </div>
+                                <div class="col">
+                                    <section class="faculty-question-bank__metric-card h-100">
+                                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                                            <h3 class="small fw-semibold mb-0">Difficulty Match</h3>
+                                            <button
+                                                class="faculty-question-bank__metric-info"
+                                                type="button"
+                                                aria-label="Difficulty Match information"
+                                                data-question-metric-tooltip
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                data-bs-title="Compares your assigned difficulty (Easy, Moderate, Hard) against actual student pass rates to spot items that are harder or easier than intended."
+                                            ><i class="bi bi-info-circle" aria-hidden="true"></i></button>
+                                        </div>
+                                        <div class="small text-muted">
+                                            Tagged {{ $item->difficulty === 'medium' ? 'Moderate' : ucfirst($item->difficulty ?? 'Moderate') }}
+                                        </div>
+                                        @if ($questionMetrics['is_easy_miscalibrated'])
+                                            <div class="small text-warning fw-semibold tabular-nums mt-1">Harder than intended ({{ number_format((float) $questionMetrics['pass_rate'], 1) }}% pass rate)</div>
+                                        @elseif ($questionMetrics['total_responses'] === 0)
+                                            <div class="small text-muted mt-1">Awaiting student responses</div>
+                                        @else
+                                            <div class="small text-muted mt-1">
+                                                Empirical pass rate: {{ number_format((float) $questionMetrics['pass_rate'], 1) }}%
+                                            </div>
+                                        @endif
+                                    </section>
+                                </div>
+                                <div class="col">
+                                    <section class="faculty-question-bank__metric-card h-100">
+                                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                                            <h3 class="small fw-semibold mb-0">Exam Reuse &amp; Exposure</h3>
+                                            <button
+                                                class="faculty-question-bank__metric-info"
+                                                type="button"
+                                                aria-label="Exam Reuse and Exposure information"
+                                                data-question-metric-tooltip
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                data-bs-title="Tracks how many exams or quizzes have included this question and when it was last used, helping you balance fresh vs. proven items."
+                                            ><i class="bi bi-info-circle" aria-hidden="true"></i></button>
+                                        </div>
+                                        <div class="small fw-semibold tabular-nums">
+                                            Used in {{ $questionMetrics['usage_count'] }} {{ $questionMetrics['usage_count'] === 1 ? 'exam' : 'exams' }}
+                                        </div>
+                                        <div class="small text-muted mt-1">
+                                            Last used:
+                                            @if ($questionMetrics['last_used_at'] !== null)
+                                                {{ $questionMetrics['last_used_at']->format('M j, Y') }}
+                                            @elseif ($questionMetrics['usage_count'] > 0)
+                                                No attempts yet
+                                            @else
+                                                Not yet used in an exam
+                                            @endif
+                                        </div>
+                                    </section>
+                                </div>
+                            </div>
                             <div class="small text-uppercase text-muted fw-bold mb-2">Answer choices</div>
                             <ol class="list-unstyled d-grid gap-2 mb-0">
                                 @foreach ($item->options as $option)
-                                    <li class="faculty-question-bank__preview-choice {{ $option === $item->correct_answer ? 'faculty-question-bank__preview-choice--correct fw-semibold' : '' }}">
+                                    @php
+                                        $choiceMetric = $questionMetrics['choice_breakdown'][$loop->index] ?? [
+                                            'percentage' => 0.0,
+                                            'is_correct' => $option === $item->correct_answer,
+                                            'is_unused_distractor' => false,
+                                        ];
+                                    @endphp
+                                    <li class="faculty-question-bank__preview-choice {{ $choiceMetric['is_correct'] ? 'faculty-question-bank__preview-choice--correct fw-semibold' : '' }}">
                                         <span class="d-flex align-items-center gap-2">
                                             <span class="faculty-question-bank__preview-letter">{{ chr(65 + $loop->index) }}</span>
                                             <span class="text-break">{{ $option }}</span>
                                         </span>
-                                        @if ($option === $item->correct_answer)
-                                            <span class="badge rounded-pill text-bg-success flex-shrink-0"><i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>Correct answer</span>
-                                        @endif
+                                        <span class="d-flex flex-column align-items-end flex-shrink-0">
+                                            @if ($choiceMetric['is_correct'])
+                                                <span class="badge rounded-pill text-bg-success"><i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>Correct answer</span>
+                                            @endif
+                                            <span class="small tabular-nums {{ $choiceMetric['is_unused_distractor'] ? 'text-warning fw-semibold' : 'text-muted' }}">
+                                                {{ number_format((float) $choiceMetric['percentage'], (float) $choiceMetric['percentage'] === (float) round((float) $choiceMetric['percentage']) ? 0 : 1) }}% picked
+                                                @if ($choiceMetric['is_unused_distractor'])
+                                                    <span>· Unused distractor</span>
+                                                @endif
+                                            </span>
+                                        </span>
                                     </li>
                                 @endforeach
                             </ol>
                         </div>
                         <div class="modal-footer justify-content-between">
-                            @if ($canManageQuestion)
-                            <form action="{{ route('admin.question-bank.destroy', $item) }}" method="POST" data-confirm-title="Remove this question from the bank?" data-confirm-message="Existing examinations will not change." data-confirm-button="Remove question">
-                                @csrf
-                                @method('DELETE')
-                                <button class="btn btn-outline-danger" type="submit">Delete</button>
-                            </form>
-                            @else
-                                <span></span>
-                            @endif
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                @if ($canManageQuestion)
+                                    <form action="{{ route('admin.question-bank.destroy', $item) }}" method="POST" data-confirm-title="Remove this question from the bank?" data-confirm-message="Existing examinations will not change." data-confirm-button="Remove question">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button class="btn btn-outline-danger" type="submit">Delete</button>
+                                    </form>
+                                @endif
+                                @if ($canFlagQuestion)
+                                    <button
+                                        class="btn btn-outline-warning"
+                                        type="button"
+                                        data-question-revision-toggle
+                                        data-url="{{ route($readOnly ? 'super-admin.question-bank.revision' : 'admin.question-bank.revision', $item) }}"
+                                        data-item-id="{{ $item->id }}"
+                                        data-csrf-token="{{ csrf_token() }}"
+                                        data-needs-revision="{{ $item->needs_revision ? 'true' : 'false' }}"
+                                        aria-label="{{ $item->needs_revision ? 'Unflag question for revision' : 'Flag question for revision' }}"
+                                    >{{ $item->needs_revision ? 'Unflag' : 'Flag for Revision' }}</button>
+                                    <span id="question-revision-feedback-{{ $item->id }}" class="small" role="status" aria-live="polite"></span>
+                                @endif
+                            </div>
                             <div class="d-flex gap-2">
                                 <button class="btn btn-light" type="button" data-bs-dismiss="modal">Close</button>
                                 @if ($canManageQuestion)
@@ -931,6 +1199,11 @@
                                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                         </div>
                                         <div class="modal-body">
+                                            @if ($questionMetrics['usage_count'] > 0)
+                                                <div class="alert alert-info py-2 px-3 mb-3 small" role="note">
+                                                    Past exam results remain preserved; edits apply to future exams.
+                                                </div>
+                                            @endif
                                             <div class="mb-3">
                                                 <label for="edit-question-text-{{ $item->id }}" class="form-label">Question</label>
                                                 <textarea id="edit-question-text-{{ $item->id }}" name="question" class="form-control" rows="3" maxlength="5000" required>{{ old('form_context') === 'edit-'.$item->id ? old('question') : $item->question }}</textarea>
@@ -1002,6 +1275,11 @@
     </section>
     @endif
 </div>
+<script>
+    document.querySelectorAll('.faculty-question-bank__question-grid .modal').forEach((modal) => {
+        document.body.appendChild(modal);
+    });
+</script>
 @if ($errors->any() && ! $readOnly)
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -1069,6 +1347,104 @@
 
                 preview.src = URL.createObjectURL(file);
                 preview.classList.remove('d-none');
+            });
+        });
+
+        document.querySelectorAll('[data-question-metric-tooltip]').forEach((button) => {
+            bootstrap.Tooltip.getOrCreateInstance(button, {
+                container: 'body',
+                delay: { show: 150, hide: 50 },
+            });
+        });
+
+        const qualityLabels = {
+            healthy: 'Healthy',
+            needs_review: 'Needs Review',
+            flagged: 'Flagged',
+            untested: 'Untested',
+        };
+        const qualityBadgeClasses = {
+            healthy: 'text-bg-success',
+            needs_review: 'text-bg-warning',
+            flagged: 'text-bg-danger',
+            untested: 'text-bg-secondary',
+        };
+        const updateQualityPill = (pill, status, unflaggedStatus) => {
+            if (!pill || !qualityLabels[status] || !qualityBadgeClasses[status]) {
+                throw new Error('The server returned an invalid question health status.');
+            }
+
+            pill.classList.remove('text-bg-success', 'text-bg-warning', 'text-bg-danger', 'text-bg-secondary');
+            pill.classList.add(qualityBadgeClasses[status]);
+            pill.dataset.qualityStatus = status;
+            pill.dataset.unflaggedQualityStatus = unflaggedStatus;
+            pill.textContent = qualityLabels[status];
+        };
+
+        document.querySelectorAll('[data-question-revision-toggle]').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const nextValue = button.dataset.needsRevision !== 'true';
+                const feedback = button.closest('.modal-footer')?.querySelector('[role="status"]');
+                button.disabled = true;
+                if (feedback) {
+                    feedback.textContent = '';
+                    feedback.classList.remove('text-danger', 'text-success');
+                }
+
+                try {
+                    const response = await fetch(button.dataset.url, {
+                        method: 'PATCH',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': button.dataset.csrfToken,
+                        },
+                        body: JSON.stringify({ needs_revision: nextValue }),
+                    });
+                    const result = await response.json().catch(() => null);
+                    if (!response.ok) {
+                        throw new Error(result?.message || 'Unable to update the revision flag. Please try again.');
+                    }
+                    if (
+                        !result
+                        || typeof result.needs_revision !== 'boolean'
+                        || typeof result.quality_status !== 'string'
+                        || typeof result.unflagged_quality_status !== 'string'
+                    ) {
+                        throw new Error('The server returned an incomplete revision update.');
+                    }
+
+                    const modal = button.closest('.modal');
+                    const statusPills = [
+                        document.getElementById(`question-health-status-${button.dataset.itemId}`),
+                        ...(modal ? Array.from(modal.querySelectorAll('[data-quality-status-pill]')) : []),
+                    ];
+                    statusPills.forEach((pill) => updateQualityPill(
+                        pill,
+                        result.quality_status,
+                        result.unflagged_quality_status,
+                    ));
+
+                    button.dataset.needsRevision = String(result.needs_revision);
+                    button.textContent = result.needs_revision ? 'Unflag' : 'Flag for Revision';
+                    button.setAttribute(
+                        'aria-label',
+                        result.needs_revision ? 'Unflag question for revision' : 'Flag question for revision',
+                    );
+                    if (feedback) {
+                        feedback.textContent = 'Revision flag updated.';
+                        feedback.classList.add('text-success');
+                    }
+                } catch (error) {
+                    if (feedback) {
+                        feedback.textContent = error instanceof Error
+                            ? error.message
+                            : 'Unable to update the revision flag. Please try again.';
+                        feedback.classList.add('text-danger');
+                    }
+                } finally {
+                    button.disabled = false;
+                }
             });
         });
 

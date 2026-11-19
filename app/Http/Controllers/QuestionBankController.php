@@ -9,10 +9,13 @@ use App\Models\QuestionBankItem;
 use App\Models\Topic;
 use App\Models\User;
 use App\Notifications\QuestionBankItemDisabledNotification;
+use App\Services\QuestionBankQualityAnalyzer;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -23,6 +26,8 @@ use RuntimeException;
 
 class QuestionBankController extends Controller
 {
+    public function __construct(private QuestionBankQualityAnalyzer $qualityAnalyzer) {}
+
     public function index(Request $request): View|RedirectResponse
     {
         $data = $this->questionBankData($request);
@@ -54,6 +59,7 @@ class QuestionBankController extends Controller
             'course_id' => ['nullable', 'integer', 'exists:courses,id'],
             'topic_id' => ['nullable', 'integer', 'exists:topics,id'],
             'difficulty' => ['nullable', Rule::in(['easy', 'medium', 'hard'])],
+            'health' => ['nullable', Rule::in(['all', 'healthy', 'needs_review', 'flagged', 'untested'])],
         ];
         if ($readOnly) {
             $rules['department_id'] = ['nullable', 'integer', 'exists:departments,id'];
@@ -90,10 +96,17 @@ class QuestionBankController extends Controller
             : (! $readOnly && ! $request->query->has('course_id') && $courses->count() === 1
                 ? $courses->first()->id
                 : null);
+        $course = $courses->firstWhere('id', $selectedCourseId);
+        $canFlagQuestions = $readOnly || (
+            $user->role === 'admin'
+            && $user->department_id !== null
+            && $course?->department_id === $user->department_id
+        );
         abort_if($selectedCourseId !== null && ! $courses->contains('id', $selectedCourseId), 404);
         abort_if($readOnly && $selectedCourseId !== null && $selectedDepartmentId === null, 404);
         $selectedTopicId = isset($validated['topic_id']) ? (int) $validated['topic_id'] : null;
         $selectedDifficulty = $validated['difficulty'] ?? null;
+        $selectedHealth = $validated['health'] ?? 'all';
         abort_if($selectedTopicId !== null && $selectedCourseId === null, 404);
 
         $topics = $selectedCourseId === null
@@ -137,20 +150,46 @@ class QuestionBankController extends Controller
                 $itemsQuery->where('difficulty', $selectedDifficulty);
             }
         }
-        $items = $itemsQuery->latest()->paginate(20)->withQueryString();
+        $perPage = 20;
+        if ($selectedHealth === 'all') {
+            $items = $itemsQuery->latest()->paginate($perPage)->withQueryString();
+            $questionQualityMetrics = $this->qualityAnalyzer->analyze($items->getCollection());
+        } else {
+            $allItems = $itemsQuery->latest()->get();
+            $allQualityMetrics = $this->qualityAnalyzer->analyze($allItems);
+            $matchingItems = $allItems
+                ->filter(fn (QuestionBankItem $item): bool => ($allQualityMetrics[$item->id]['quality_status'] ?? 'untested') === $selectedHealth)
+                ->values();
+            $currentPage = LengthAwarePaginator::resolveCurrentPage();
+            $items = new LengthAwarePaginator(
+                $matchingItems->forPage($currentPage, $perPage)->values(),
+                $matchingItems->count(),
+                $perPage,
+                $currentPage,
+                [
+                    'path' => LengthAwarePaginator::resolveCurrentPath(),
+                    'query' => $request->query(),
+                ],
+            );
+            $pageItemIds = $items->getCollection()->modelKeys();
+            $questionQualityMetrics = array_intersect_key($allQualityMetrics, array_fill_keys($pageItemIds, true));
+        }
 
         return [
             'items' => $items,
+            'questionQualityMetrics' => $questionQualityMetrics,
             'departments' => $departments,
             'filterCourses' => $filterCourses,
             'courses' => $courses,
-            'course' => $courses->firstWhere('id', $selectedCourseId),
+            'course' => $course,
+            'canFlagQuestions' => $canFlagQuestions,
             'selectedDepartmentId' => $selectedDepartmentId,
             'selectedCourseId' => $selectedCourseId,
             'topics' => $topics,
             'selectedTopic' => $selectedTopic,
             'topicHasOtherFacultyQuestions' => $topicHasOtherFacultyQuestions,
             'selectedDifficulty' => $selectedDifficulty,
+            'selectedHealth' => $selectedHealth,
             'readOnly' => $readOnly,
         ];
     }
@@ -301,6 +340,26 @@ class QuestionBankController extends Controller
             : redirect()->route('admin.question-bank.topics.show', $questionBankItem->topic_id);
 
         return $redirect->with('success', $isActive ? 'Question enabled for future exams.' : 'Question disabled for future exams.');
+    }
+
+    public function updateRevisionFlag(Request $request, QuestionBankItem $questionBankItem): JsonResponse
+    {
+        $this->ensureCanFlagQuestion($request->user(), $questionBankItem);
+        abort_if($questionBankItem->topic_id === null, 404);
+        $validated = $request->validate([
+            'needs_revision' => ['required', 'boolean'],
+        ]);
+
+        $questionBankItem->update([
+            'needs_revision' => (bool) $validated['needs_revision'],
+        ]);
+        $qualityMetrics = $this->qualityAnalyzer->analyze(collect([$questionBankItem]))[$questionBankItem->id];
+
+        return response()->json([
+            'needs_revision' => $questionBankItem->needs_revision,
+            'quality_status' => $qualityMetrics['quality_status'],
+            'unflagged_quality_status' => $qualityMetrics['unflagged_quality_status'],
+        ]);
     }
 
     public function adminIndex(Request $request): View
@@ -466,6 +525,20 @@ class QuestionBankController extends Controller
                 && $questionBankItem->course()->where('department_id', $faculty->department_id)->exists(),
             404,
         );
+    }
+
+    private function ensureCanFlagQuestion(User $user, QuestionBankItem $questionBankItem): void
+    {
+        $isQuestionAuthor = $questionBankItem->author_id !== null
+            && (int) $questionBankItem->author_id === (int) $user->getKey();
+        $isSuperAdmin = $user->role === 'super-admin';
+        $isFacultyInSameDepartment = $user->role === 'admin'
+            && $user->department_id !== null
+            && $questionBankItem->course()
+                ->where('department_id', $user->department_id)
+                ->exists();
+
+        abort_unless(! $isQuestionAuthor && ($isSuperAdmin || $isFacultyInSameDepartment), 404);
     }
 
     private function ensureFacultyOwnsTopic(User $faculty, Topic $topic): void

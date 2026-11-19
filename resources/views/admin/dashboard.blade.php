@@ -307,7 +307,13 @@
                                 <i class="bi bi-people-fill fs-4"></i>
                             </div>
                         </div>
-                        <div class="text-muted small fw-bold text-uppercase tracking-wider mb-1">Total Students</div>
+                        <div class="text-muted small fw-bold text-uppercase tracking-wider mb-1 d-flex align-items-center gap-1">
+                            Total Students
+                            <span class="kpi-info-trigger" tabindex="0" role="img" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                  aria-label="About total students" title="Counts student accounts enrolled in your program.">
+                                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                            </span>
+                        </div>
                         <div class="metric-value">{{ $departmentStudents }}</div>
                     </div>
                     <div class="text-secondary small mt-3 d-flex align-items-center gap-2 fw-medium">
@@ -325,7 +331,13 @@
                                 <i class="bi bi-check-circle-fill fs-4"></i>
                             </div>
                         </div>
-                        <div class="text-muted small fw-bold text-uppercase tracking-wider mb-1">Active Students</div>
+                        <div class="text-muted small fw-bold text-uppercase tracking-wider mb-1 d-flex align-items-center gap-1">
+                            Active Students
+                            <span class="kpi-info-trigger" tabindex="0" role="img" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                  aria-label="About active students" title="Students with at least one study or assessment activity during the selected reporting period.">
+                                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                            </span>
+                        </div>
                         <div class="metric-value text-success">{{ $activeStudentsCount }}</div>
                     </div>
                     <div class="text-secondary small mt-3 d-flex align-items-center gap-2 fw-medium">
@@ -343,7 +355,13 @@
                                 <i class="bi bi-person-dash-fill fs-4 text-dark"></i>
                             </div>
                         </div>
-                        <div class="text-muted small fw-bold text-uppercase tracking-wider mb-1">Inactive Students</div>
+                        <div class="text-muted small fw-bold text-uppercase tracking-wider mb-1 d-flex align-items-center gap-1">
+                            Inactive Students
+                            <span class="kpi-info-trigger" tabindex="0" role="img" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                  aria-label="About inactive students" title="Students with no recorded study or assessment activity during the selected reporting period.">
+                                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                            </span>
+                        </div>
                         <div class="metric-value text-dark">{{ $inactiveStudentsCount }}</div>
                     </div>
                     <div class="text-secondary small mt-3 d-flex align-items-center gap-2 fw-medium">
@@ -360,7 +378,13 @@
                                 <i class="bi bi-graph-up-arrow fs-4"></i>
                             </div>
                         </div>
-                        <div class="text-muted small fw-bold text-uppercase tracking-wider mb-1">Average General-Test Score</div>
+                        <div class="text-muted small fw-bold text-uppercase tracking-wider mb-1 d-flex align-items-center gap-1">
+                            Average General-Test Score
+                            <span class="kpi-info-trigger" tabindex="0" role="img" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                  aria-label="About average general-test score" title="The average percentage from participating students' latest general-test results.">
+                                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                            </span>
+                        </div>
                         <div class="metric-value" style="color: #ca8a04;">{{ $averageCollegeScore === null ? '—' : $averageCollegeScore.'%' }}</div>
                     </div>
                     <div class="text-secondary small mt-3 d-flex align-items-center gap-2 fw-medium">
@@ -377,7 +401,13 @@
                                 <i class="bi bi-bullseye fs-4"></i>
                             </div>
                         </div>
-                        <div class="text-muted small fw-bold text-uppercase tracking-wider mb-1">Pass Rate</div>
+                        <div class="text-muted small fw-bold text-uppercase tracking-wider mb-1 d-flex align-items-center gap-1">
+                            Pass Rate
+                            <span class="kpi-info-trigger" tabindex="0" role="img" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                  aria-label="About pass rate" title="The percentage of participating students whose latest general-test score met or exceeded 75%.">
+                                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                            </span>
+                        </div>
                         <div class="metric-value text-success">{{ $collegePassRate === null ? '—' : $collegePassRate.'%' }}</div>
                     </div>
                     <div class="text-secondary small mt-3">{{ $generalTestParticipants }} participating students · latest score ≥ 75%</div>

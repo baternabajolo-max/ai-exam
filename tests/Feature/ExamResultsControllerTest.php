@@ -64,6 +64,8 @@ class ExamResultsControllerTest extends TestCase
             ->assertSee('Bsce')
             ->assertDontSee('BSCE46')
             ->assertSee($exam->title)
+            ->assertSee('About participation rate')
+            ->assertSee('About class average score')
             ->assertSee('View Performance')
             ->assertSee('No attempt recorded')
             ->assertSee('Time Expired')
@@ -240,7 +242,7 @@ class ExamResultsControllerTest extends TestCase
         $hardQuestion = $exam->questions()->create([
             'question' => 'Hard question in Genetics?',
             'options' => ['Correct', 'Incorrect'],
-            'correct_answer' => 'Correct',
+            'correct_answer' => 'Hard answer key',
             'explanation' => 'Hard genetics explanation.',
             'topic' => 'Genetics',
             'difficulty' => 'hard',
@@ -281,7 +283,6 @@ class ExamResultsControllerTest extends TestCase
                     'topic' => 'Genetics',
                     'difficulty' => 'hard',
                     'user_answer' => null,
-                    'correct_answer' => 'Correct',
                     'is_correct' => false,
                     'explanation' => 'Snapshot rationale three.',
                 ],
@@ -299,7 +300,12 @@ class ExamResultsControllerTest extends TestCase
             ->assertSee('Back to Results')
             ->assertSee('Auto-Submitted: Time Expired')
             ->assertSee('Snapshot: Genetics question one')
-            ->assertSee('Snapshot rationale one.');
+            ->assertSee('Snapshot rationale one.')
+            ->assertSee('Hard answer key')
+            ->assertSee('About time used')
+            ->assertSee('bi-funnel', false)
+            ->assertSee('audit-topic')
+            ->assertSee('audit-difficulty');
 
         $this->assertSame(1, $response->viewData('correctCount'));
         $this->assertSame(3, $response->viewData('totalItems'));

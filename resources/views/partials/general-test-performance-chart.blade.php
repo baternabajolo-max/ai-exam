@@ -16,7 +16,13 @@
     <div class="row g-3 mb-3">
         <div class="col-sm-6 col-lg-4">
             <article class="analytics-summary-card p-3 h-100">
-                <div class="small fw-bold text-secondary text-uppercase">Attempts scoring 75%+</div>
+                <div class="small fw-bold text-secondary text-uppercase d-flex align-items-center gap-2">
+                    Attempts scoring 75%+
+                    <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                            aria-label="About passing attempts" title="Counts attempts within the selected date range that reached the 75% passing target.">
+                        <i class="bi bi-info-circle" aria-hidden="true"></i>
+                    </button>
+                </div>
                 <div class="analytics-summary-value">{{ $studentAnalytics['passing_attempts'] }}</div>
                 <div class="small text-secondary">Selected date range</div>
             </article>

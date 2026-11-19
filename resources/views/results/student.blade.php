@@ -65,6 +65,14 @@
         overflow: hidden;
     }
 
+    .performance-section--audit {
+        overflow: visible;
+    }
+
+    .performance-hero .kpi-info-trigger {
+        color: #fff;
+    }
+
     .performance-section__header {
         border-bottom: 1px solid var(--performance-line);
         padding: 1rem 1.2rem;
@@ -236,7 +244,13 @@
                 </div>
             </div>
             <div class="text-start text-lg-end">
-                <div class="text-white-50 small fw-bold text-uppercase mb-1" style="letter-spacing:.1em">Overall score</div>
+                <div class="text-white-50 small fw-bold text-uppercase mb-1 d-flex align-items-center gap-2" style="letter-spacing:.1em">
+                    Overall score
+                    <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                            aria-label="About overall score" title="Shows the number of correct answers out of all questions, with the percentage and pass result below.">
+                        <i class="bi bi-info-circle" aria-hidden="true"></i>
+                    </button>
+                </div>
                 <div class="display-4 fw-bold lh-1">{{ $result->score }} <span class="fs-3 text-white-50">/ {{ $totalQuestions }}</span></div>
                 <div class="d-flex align-items-center justify-content-lg-end gap-2 mt-2">
                     <span class="fs-5 fw-bold">{{ number_format($scorePercentage, 1) }}%</span>
@@ -253,7 +267,13 @@
     <section class="row g-3 mb-4" aria-label="Time pressure and pacing">
         <div class="col-12 col-md-4">
             <article class="performance-card">
-                <div class="performance-label mb-2">Time used</div>
+                <div class="performance-label d-flex align-items-center gap-2 mb-2">
+                    Time used
+                    <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                            aria-label="About time used" title="Shows the time recorded for this attempt compared with the exam time limit.">
+                        <i class="bi bi-info-circle" aria-hidden="true"></i>
+                    </button>
+                </div>
                 <div class="performance-value">{{ $timeUsedLabel }} <span class="text-muted fs-6 fw-semibold">/ {{ $timeLimitLabel }}</span></div>
                 @php
                     $timeProgress = $timeUsedSeconds !== null && $timeLimitSeconds
@@ -268,7 +288,13 @@
         </div>
         <div class="col-12 col-md-4">
             <article class="performance-card">
-                <div class="performance-label mb-2">Average pace</div>
+                <div class="performance-label d-flex align-items-center gap-2 mb-2">
+                    Average pace
+                    <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                            aria-label="About average pace" title="Shows the average time spent per question, calculated from the total attempt time.">
+                        <i class="bi bi-info-circle" aria-hidden="true"></i>
+                    </button>
+                </div>
                 <div class="performance-value">{{ $averagePaceSeconds === null ? '—' : $averagePaceSeconds.' sec / item' }}</div>
                 <div class="small text-muted mt-3">
                     Target pace: {{ $targetPaceSeconds === null ? '—' : $targetPaceSeconds.' sec / item' }}
@@ -277,7 +303,13 @@
         </div>
         <div class="col-12 col-md-4">
             <article class="performance-card">
-                <div class="performance-label mb-2">Unanswered items</div>
+                <div class="performance-label d-flex align-items-center gap-2 mb-2">
+                    Unanswered items
+                    <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                            aria-label="About unanswered items" title="Counts questions that were left blank in this attempt.">
+                        <i class="bi bi-info-circle" aria-hidden="true"></i>
+                    </button>
+                </div>
                 <div class="performance-value">{{ $unansweredCount }}</div>
                 <div class="small text-muted mt-3">Items left blank in this attempt</div>
             </article>
@@ -298,7 +330,13 @@
                     <article class="performance-card">
                         <div class="d-flex justify-content-between align-items-start gap-3">
                             <div>
-                                <div class="performance-label mb-2">{{ $difficulty['label'] }}</div>
+                                <div class="performance-label d-flex align-items-center gap-2 mb-2">
+                                    {{ $difficulty['label'] }}
+                                    <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                            aria-label="About {{ $difficulty['label'] }} accuracy" title="Shows how many questions of this difficulty were answered correctly and the accuracy percentage.">
+                                        <i class="bi bi-info-circle" aria-hidden="true"></i>
+                                    </button>
+                                </div>
                                 <div class="performance-value">{{ $difficulty['correct'] }} / {{ $difficulty['total'] }} Correct</div>
                             </div>
                             <span class="badge rounded-pill {{ $difficulty['accuracy'] !== null && $difficulty['accuracy'] >= 75 ? 'text-bg-success' : 'text-bg-light border' }}">
@@ -399,7 +437,7 @@
         </div>
     </section>
 
-    <section class="performance-section" aria-labelledby="audit-heading">
+    <section class="performance-section performance-section--audit" aria-labelledby="audit-heading">
         <div class="performance-section__header">
             <div class="performance-label">Attempt review</div>
             <h2 class="h4 fw-bold mb-0" id="audit-heading">Randomized question audit log</h2>
@@ -415,47 +453,66 @@
                     ], fn ($value) => $value !== null && $value !== ''),
                 );
             @endphp
-            <ul class="nav nav-pills performance-audit-tabs gap-2 mb-3" aria-label="Filter questions">
-                <li class="nav-item">
-                    <a class="nav-link {{ $itemFilter === 'all' ? 'active' : '' }}" href="{{ route($studentRoute, $auditRouteParameters('all')) }}">All Items <span class="opacity-75">({{ $items->count() }})</span></a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {{ $itemFilter === 'incorrect' ? 'active' : '' }}" href="{{ route($studentRoute, $auditRouteParameters('incorrect')) }}">Incorrect Only <span class="opacity-75">({{ $items->filter(fn ($item) => ! $item['is_correct'] && ! $item['is_unanswered'])->count() }})</span></a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {{ $itemFilter === 'unanswered' ? 'active' : '' }}" href="{{ route($studentRoute, $auditRouteParameters('unanswered')) }}">Unanswered <span class="opacity-75">({{ $unansweredCount }})</span></a>
-                </li>
-            </ul>
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+                <ul class="nav nav-pills performance-audit-tabs gap-2 mb-0" aria-label="Filter questions by answer status">
+                    <li class="nav-item">
+                        <a class="nav-link {{ $itemFilter === 'all' ? 'active' : '' }}" href="{{ route($studentRoute, $auditRouteParameters('all')) }}">All Items <span class="opacity-75">({{ $items->count() }})</span></a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ $itemFilter === 'incorrect' ? 'active' : '' }}" href="{{ route($studentRoute, $auditRouteParameters('incorrect')) }}">Incorrect Only <span class="opacity-75">({{ $items->filter(fn ($item) => ! $item['is_correct'] && ! $item['is_unanswered'])->count() }})</span></a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ $itemFilter === 'unanswered' ? 'active' : '' }}" href="{{ route($studentRoute, $auditRouteParameters('unanswered')) }}">Unanswered <span class="opacity-75">({{ $unansweredCount }})</span></a>
+                    </li>
+                </ul>
 
-            <form method="GET" action="{{ route($studentRoute, ['exam' => $exam->id, 'student' => $student->id]) }}" class="row g-2 align-items-end mb-4">
-                <input type="hidden" name="item_filter" value="{{ $itemFilter }}">
-                @foreach (['college_id', 'course_id', 'student_search', 'status'] as $filterKey)
-                    @if (isset($detailRouteParameters[$filterKey]))
-                        <input type="hidden" name="{{ $filterKey }}" value="{{ $detailRouteParameters[$filterKey] }}">
-                    @endif
-                @endforeach
-                <div class="col-12 col-md-5">
-                    <label class="form-label fw-semibold" for="audit-topic">Topic</label>
-                    <select class="form-select" id="audit-topic" name="topic">
-                        <option value="">All topics</option>
-                        @foreach ($items->pluck('topic')->unique()->sort() as $topic)
-                            <option value="{{ $topic }}" @selected($selectedTopic === $topic)>{{ $topic }}</option>
-                        @endforeach
-                    </select>
+                <div class="dropdown ms-auto">
+                    <button
+                        class="btn btn-outline-secondary rounded-circle d-inline-flex align-items-center justify-content-center"
+                        id="audit-filter-toggle"
+                        type="button"
+                        data-bs-toggle="dropdown"
+                        data-bs-auto-close="outside"
+                        aria-expanded="false"
+                        aria-label="Filter questions by topic and difficulty"
+                        title="Filter questions"
+                        style="height:2.75rem;width:2.75rem"
+                    >
+                        <i class="bi bi-funnel" aria-hidden="true"></i>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end p-3 shadow-sm" aria-labelledby="audit-filter-toggle" style="width:min(22rem, calc(100vw - 2rem))">
+                        <form method="GET" action="{{ route($studentRoute, ['exam' => $exam->id, 'student' => $student->id]) }}" class="d-grid gap-2">
+                            <input type="hidden" name="item_filter" value="{{ $itemFilter }}">
+                            @foreach (['college_id', 'course_id', 'student_search', 'status'] as $filterKey)
+                                @if (isset($detailRouteParameters[$filterKey]))
+                                    <input type="hidden" name="{{ $filterKey }}" value="{{ $detailRouteParameters[$filterKey] }}">
+                                @endif
+                            @endforeach
+                            <div>
+                                <label class="form-label fw-semibold mb-1" for="audit-topic">Topic</label>
+                                <select class="form-select" id="audit-topic" name="topic">
+                                    <option value="">All topics</option>
+                                    @foreach ($items->pluck('topic')->unique()->sort() as $topic)
+                                        <option value="{{ $topic }}" @selected($selectedTopic === $topic)>{{ $topic }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label fw-semibold mb-1" for="audit-difficulty">Difficulty</label>
+                                <select class="form-select" id="audit-difficulty" name="difficulty">
+                                    <option value="">All difficulties</option>
+                                    @foreach (['easy' => 'Easy', 'moderate' => 'Moderate', 'hard' => 'Hard'] as $difficulty => $label)
+                                        <option value="{{ $difficulty }}" @selected($selectedDifficulty === $difficulty)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <button class="btn btn-outline-danger rounded-pill px-4 mt-1" type="submit">
+                                <i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply filters
+                            </button>
+                        </form>
+                    </div>
                 </div>
-                <div class="col-12 col-md-4">
-                    <label class="form-label fw-semibold" for="audit-difficulty">Difficulty</label>
-                    <select class="form-select" id="audit-difficulty" name="difficulty">
-                        <option value="">All difficulties</option>
-                        @foreach (['easy' => 'Easy', 'moderate' => 'Moderate', 'hard' => 'Hard'] as $difficulty => $label)
-                            <option value="{{ $difficulty }}" @selected($selectedDifficulty === $difficulty)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-12 col-md-auto">
-                    <button class="btn btn-outline-danger rounded-pill px-4" type="submit">Apply filters</button>
-                </div>
-            </form>
+            </div>
 
             @if ($filteredItems->isEmpty())
                 <div class="rounded-4 bg-light text-center p-4 text-muted">

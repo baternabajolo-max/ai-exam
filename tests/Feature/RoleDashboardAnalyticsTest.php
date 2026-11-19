@@ -116,6 +116,8 @@ class RoleDashboardAnalyticsTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.dashboard', ['period' => 7, 'activity' => 'active']))
             ->assertSee('Study or assessment activity')
+            ->assertSee('About active students')
+            ->assertSee('About pass rate')
             ->assertViewHas('activeStudentsCount', 2)
             ->assertViewHas('inactiveStudentsCount', 1)
             ->assertViewHas('averageCollegeScore', 100)
@@ -595,6 +597,7 @@ class RoleDashboardAnalyticsTest extends TestCase
             ->get(route('super-admin.dashboard', ['period' => 30]))
             ->assertSee('System analytics')
             ->assertSee('College performance and participation')
+            ->assertSee('About active participation')
             ->assertViewHas('totalStudents', 3)
             ->assertViewHas('activeParticipationRate', 67)
             ->assertViewHas('periodLabel', 'Last 30 days');

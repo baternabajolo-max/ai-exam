@@ -277,28 +277,52 @@
         <section class="row g-3 mb-4" aria-label="Examination summary">
             <div class="col-12 col-sm-6 col-xl-3">
                 <article class="results-kpi-card">
-                    <div class="results-kpi-label mb-2">Participation rate</div>
+                    <div class="results-kpi-label d-flex align-items-center gap-2 mb-2">
+                        Participation rate
+                        <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                aria-label="About participation rate" title="Shows how many eligible students started this exam, plus the participation percentage.">
+                            <i class="bi bi-info-circle" aria-hidden="true"></i>
+                        </button>
+                    </div>
                     <div class="results-kpi-value">{{ $summary['participant_count'] }} / {{ $summary['student_count'] }}</div>
                     <div class="small text-muted mt-2">Students took the exam · {{ $summary['participation_percentage'] }}%</div>
                 </article>
             </div>
             <div class="col-12 col-sm-6 col-xl-3">
                 <article class="results-kpi-card">
-                    <div class="results-kpi-label mb-2">Class average score</div>
+                    <div class="results-kpi-label d-flex align-items-center gap-2 mb-2">
+                        Class average score
+                        <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                aria-label="About class average score" title="The mean score percentage across all recorded student attempts for this exam.">
+                            <i class="bi bi-info-circle" aria-hidden="true"></i>
+                        </button>
+                    </div>
                     <div class="results-kpi-value">{{ $summary['average_percentage'] === null ? '—' : number_format($summary['average_percentage'], 1).'%' }}</div>
                     <div class="small text-muted mt-2">Across all recorded attempts</div>
                 </article>
             </div>
             <div class="col-12 col-sm-6 col-xl-3">
                 <article class="results-kpi-card">
-                    <div class="results-kpi-label mb-2">Passing rate</div>
+                    <div class="results-kpi-label d-flex align-items-center gap-2 mb-2">
+                        Passing rate
+                        <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                aria-label="About passing rate" title="Counts students who met the exam passing threshold, compared with all students who participated.">
+                            <i class="bi bi-info-circle" aria-hidden="true"></i>
+                        </button>
+                    </div>
                     <div class="results-kpi-value">{{ $summary['passing_count'] }} / {{ $summary['participant_count'] }}</div>
                     <div class="small text-muted mt-2">Students passed · {{ \App\Models\Test::PASSING_SCORE_PERCENTAGE }}% threshold</div>
                 </article>
             </div>
             <div class="col-12 col-sm-6 col-xl-3">
                 <article class="results-kpi-card">
-                    <div class="results-kpi-label mb-2">Time-out rate</div>
+                    <div class="results-kpi-label d-flex align-items-center gap-2 mb-2">
+                        Time-out rate
+                        <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                aria-label="About time-out rate" title="Counts attempts automatically submitted when the exam time limit ended. The note below shows the share of all takers.">
+                            <i class="bi bi-info-circle" aria-hidden="true"></i>
+                        </button>
+                    </div>
                     <div class="results-kpi-value">{{ $summary['timeout_count'] }}</div>
                     <div class="small text-muted mt-2">
                         {{ $summary['participant_count'] > 0 ? number_format(($summary['timeout_count'] / $summary['participant_count']) * 100, 1).'%' : '0%' }} of takers auto-submitted

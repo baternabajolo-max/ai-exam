@@ -362,7 +362,13 @@
                         <i class="bi bi-patch-check-fill"></i>
                     </div>
                     <div>
-                        <h2 id="curriculum-progress-title" class="h6 fw-bold mb-1">Curriculum progress</h2>
+                        <h2 id="curriculum-progress-title" class="h6 fw-bold mb-1 d-flex align-items-center gap-2">
+                            Curriculum progress
+                            <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                    aria-label="About curriculum progress" title="Shows how many topics you have mastered out of all topics in your modules.">
+                                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                            </button>
+                        </h2>
                         <p class="text-secondary small mb-0">
                             {{ $completedSubtopics }} of {{ $totalSubtopics }} topics mastered
                         </p>

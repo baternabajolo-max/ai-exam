@@ -147,7 +147,13 @@
             <div class="col">
                 <article class="system-kpi h-100">
                     <span class="system-kpi-icon"><i class="bi bi-buildings" aria-hidden="true"></i></span>
-                    <span class="system-kpi-label">{{ $selectedCourse ? 'Programs' : 'Colleges' }}</span>
+                    <span class="system-kpi-label">
+                        {{ $selectedCourse ? 'Programs' : 'Colleges' }}
+                        <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                aria-label="About {{ $selectedCourse ? 'programs' : 'colleges' }}" title="Counts {{ $selectedCourse ? 'programs' : 'colleges' }} in the current dashboard scope.">
+                            <i class="bi bi-info-circle" aria-hidden="true"></i>
+                        </button>
+                    </span>
                     <strong class="system-kpi-value">{{ $totalDepartments }}</strong>
                     <span class="system-kpi-note">{{ $selectedCourse ? 'Selected program' : ($selectedDepartment ? 'Selected college' : 'Configured in the system') }}</span>
                 </article>
@@ -155,7 +161,13 @@
             <div class="col">
                 <article class="system-kpi h-100">
                     <span class="system-kpi-icon"><i class="bi bi-person-badge" aria-hidden="true"></i></span>
-                    <span class="system-kpi-label">Faculty</span>
+                    <span class="system-kpi-label">
+                        Faculty
+                        <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                aria-label="About faculty" title="Counts faculty accounts associated with the selected college or program, or across the system.">
+                            <i class="bi bi-info-circle" aria-hidden="true"></i>
+                        </button>
+                    </span>
                     <strong class="system-kpi-value">{{ $totalAdmins }}</strong>
                     <span class="system-kpi-note">{{ $selectedCourse ? 'Associated with '.$selectedCourse->name : ($selectedDepartment ? 'In '.$selectedDepartment->name : 'Across all colleges') }}</span>
                 </article>
@@ -163,7 +175,13 @@
             <div class="col">
                 <article class="system-kpi h-100">
                     <span class="system-kpi-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
-                    <span class="system-kpi-label">Students</span>
+                    <span class="system-kpi-label">
+                        Students
+                        <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                aria-label="About students" title="Counts registered student accounts in the current dashboard scope.">
+                            <i class="bi bi-info-circle" aria-hidden="true"></i>
+                        </button>
+                    </span>
                     <strong class="system-kpi-value">{{ $totalStudents }}</strong>
                     <span class="system-kpi-note">{{ $selectedCourse ? 'Registered in '.$selectedCourse->name : ($selectedDepartment ? 'Registered in '.$selectedDepartment->name : 'All registered student accounts') }}</span>
                 </article>
@@ -171,7 +189,13 @@
             <div class="col">
                 <article class="system-kpi h-100">
                     <span class="system-kpi-icon is-green"><i class="bi bi-activity" aria-hidden="true"></i></span>
-                    <span class="system-kpi-label">Active participation</span>
+                    <span class="system-kpi-label">
+                        Active participation
+                        <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                aria-label="About active participation" title="The percentage of students with at least one reading session or assessment during the selected period.">
+                            <i class="bi bi-info-circle" aria-hidden="true"></i>
+                        </button>
+                    </span>
                     <strong class="system-kpi-value">{{ $activeParticipationRate === null ? '—' : $activeParticipationRate.'%' }}</strong>
                     <span class="system-kpi-note">{{ $activeStudentCount }} / {{ $departmentStudentTotal }} {{ $selectedCourse ? 'program students' : ($selectedDepartment ? 'students' : 'college students') }} · last {{ $periodDays }} days</span>
                 </article>

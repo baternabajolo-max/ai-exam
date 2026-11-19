@@ -189,8 +189,12 @@
                 <span class="text-muted small fw-semibold">of {{ $totalQuestions }} correct</span>
             </div>
 
-            <h2 class="h3 fw-bold mb-1" style="color: var(--slate-900);">
+            <h2 class="h3 fw-bold mb-1 d-flex align-items-center justify-content-center gap-2" style="color: var(--slate-900);">
                 {{ $percentage }}% Overall Accuracy
+                <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                        aria-label="About overall accuracy" title="The percentage of quiz questions answered correctly.">
+                    <i class="bi bi-info-circle" aria-hidden="true"></i>
+                </button>
             </h2>
             <p class="text-muted small mb-4">
                 Score recorded for <strong>{{ $result->test->title ?? 'this quiz' }}</strong>
@@ -200,19 +204,37 @@
             <div class="row g-3 justify-content-center mb-4" style="max-width: 600px; margin: 0 auto;">
                 <div class="col-4">
                     <div class="metric-badge-box text-center">
-                        <span class="text-uppercase fw-semibold text-muted d-block small" style="font-size: 0.7rem; letter-spacing: 0.04em;">Correct</span>
+                        <span class="text-uppercase fw-semibold text-muted d-flex align-items-center justify-content-center gap-1 small" style="font-size: 0.7rem; letter-spacing: 0.04em;">
+                            Correct
+                            <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                    aria-label="About correct answers" title="The number of questions answered correctly.">
+                                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                            </button>
+                        </span>
                         <span class="fs-5 fw-bold" style="color: var(--emerald-600);">{{ $currentScore }}</span>
                     </div>
                 </div>
                 <div class="col-4">
                     <div class="metric-badge-box text-center">
-                        <span class="text-uppercase fw-semibold text-muted d-block small" style="font-size: 0.7rem; letter-spacing: 0.04em;">Incorrect</span>
+                        <span class="text-uppercase fw-semibold text-muted d-flex align-items-center justify-content-center gap-1 small" style="font-size: 0.7rem; letter-spacing: 0.04em;">
+                            Incorrect
+                            <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                    aria-label="About incorrect answers" title="The number of questions answered incorrectly.">
+                                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                            </button>
+                        </span>
                         <span class="fs-5 fw-bold" style="color: var(--rose-600);">{{ $incorrectCount }}</span>
                     </div>
                 </div>
                 <div class="col-4">
                     <div class="metric-badge-box text-center">
-                        <span class="text-uppercase fw-semibold text-muted d-block small" style="font-size: 0.7rem; letter-spacing: 0.04em;">Total Items</span>
+                        <span class="text-uppercase fw-semibold text-muted d-flex align-items-center justify-content-center gap-1 small" style="font-size: 0.7rem; letter-spacing: 0.04em;">
+                            Total Items
+                            <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                    aria-label="About total items" title="The total number of questions included in this quiz.">
+                                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                            </button>
+                        </span>
                         <span class="fs-5 fw-bold" style="color: var(--slate-900);">{{ $totalQuestions }}</span>
                     </div>
                 </div>

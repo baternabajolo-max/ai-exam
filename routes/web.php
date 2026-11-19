@@ -108,6 +108,7 @@ Route::middleware(['auth', 'role:super-admin'])->prefix('super-admin')->name('su
     Route::post('/students/{student}/tests/{test}/retake', [AdminController::class, 'activateExamRetake'])->name('students.tests.retake');
     Route::get('/question-bank', [QuestionBankController::class, 'adminIndex'])->name('question-bank.index');
     Route::patch('/question-bank/{questionBankItem}/status', [QuestionBankController::class, 'updateStatus'])->name('question-bank.status');
+    Route::patch('/question-bank/{questionBankItem}/revision', [QuestionBankController::class, 'updateRevisionFlag'])->name('question-bank.revision');
     Route::get('/item-analysis', [ItemAnalysisController::class, 'adminIndex'])->name('item-analysis.index');
     Route::get('/profile', [SuperAdminController::class, 'profile'])->name('profile');
     Route::put('/profile', [AccountController::class, 'update'])->name('profile.update');
@@ -226,6 +227,7 @@ Route::middleware(['auth', 'role:admin', TrackFacultyActivity::class])->prefix('
     Route::delete('/question-bank/topics/{topic}', [QuestionBankController::class, 'destroyTopic'])->name('question-bank.topics.destroy');
     Route::post('/question-bank', [QuestionBankController::class, 'store'])->name('question-bank.store');
     Route::patch('/question-bank/{questionBankItem}/status', [QuestionBankController::class, 'updateStatus'])->name('question-bank.status');
+    Route::patch('/question-bank/{questionBankItem}/revision', [QuestionBankController::class, 'updateRevisionFlag'])->name('question-bank.revision');
     Route::put('/question-bank/{questionBankItem}', [QuestionBankController::class, 'update'])->name('question-bank.update');
     Route::delete('/question-bank/{questionBankItem}', [QuestionBankController::class, 'destroy'])->name('question-bank.destroy');
     Route::get('/item-analysis', [ItemAnalysisController::class, 'facultyIndex'])->name('item-analysis.index');

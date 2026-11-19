@@ -6,12 +6,14 @@ use App\Models\Course;
 use App\Models\Department;
 use App\Models\Question;
 use App\Models\QuestionBankItem;
+use App\Models\Result;
 use App\Models\Test as Exam;
 use App\Models\Topic;
 use App\Models\User;
 use App\Notifications\QuestionBankItemDisabledNotification;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -383,6 +385,7 @@ class QuestionBankControllerTest extends TestCase
         $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
         $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
         $faculty = User::factory()->create([
+            'name' => 'test',
             'role' => 'admin',
             'department_id' => $department->id,
             'course_id' => $course->id,
@@ -416,6 +419,7 @@ class QuestionBankControllerTest extends TestCase
             ->assertSee('data-bs-target="#viewQuestionModal'.$item->id.'"', false)
             ->assertSee('id="viewQuestionModal'.$item->id.'"', false)
             ->assertSee('aria-label="View question and answer choices"', false)
+            ->assertSee("document.querySelectorAll('.faculty-question-bank__question-grid .modal')", false)
             ->assertSee('HTTPS')
             ->assertSee('FTP')
             ->assertSee('Correct answer')
@@ -431,12 +435,188 @@ class QuestionBankControllerTest extends TestCase
             ->assertSee('Moderate')
             ->assertSee('Hard')
             ->assertSee('bi-funnel', false)
+            ->assertSee('Filter questions by health status')
+            ->assertSee('All Health')
+            ->assertSee('Added by: test')
+            ->assertDontSee('data-url="'.route('admin.question-bank.revision', $item).'"', false)
             ->assertDontSee('Module topic')
             ->assertDontSee('name="subtopic_id"', false)
             ->assertSee('name="correct_choice"', false)
             ->assertSee('accept=".jpg,.jpeg,.png,.webp"', false)
             ->assertSee('src="'.asset('storage/'.$item->image_path).'"', false)
             ->assertDontSee('View Item Analysis');
+    }
+
+    public function test_question_preview_aggregates_attempts_and_health_filter_covers_the_topic_roster(): void
+    {
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
+        $faculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $student = User::factory()->create(['role' => 'student', 'department_id' => $department->id]);
+        $topic = $this->createTopic($course, $faculty, 'Network security');
+        $item = $this->createQuestionBankItem($course, $faculty, $topic, 'Which choice is correct?');
+        $item->update([
+            'options' => ['A', 'B', 'C', 'D'],
+            'correct_answer' => 'A',
+            'difficulty' => 'easy',
+        ]);
+        $untestedItem = $this->createQuestionBankItem($course, $faculty, $topic, 'Which question has no responses?');
+        $untestedItem->update(['author_id' => null]);
+        $healthyItem = $this->createQuestionBankItem($course, $faculty, $topic, 'Which question is healthy?');
+        $unsafeNameFaculty = User::factory()->create([
+            'name' => '<script>alert(1)</script>',
+            'role' => 'admin',
+            'department_id' => $department->id,
+        ]);
+        $healthyItem->update(['author_id' => $unsafeNameFaculty->id]);
+        $lowPassItem = $this->createQuestionBankItem($course, $faculty, $topic, 'Which question has a low pass rate?');
+        $lowPassItem->update(['difficulty' => 'easy']);
+
+        $firstSnapshot = $this->createQuestionSnapshot($department, $course, $faculty, $topic, $item);
+        $secondSnapshot = $this->createQuestionSnapshot($department, $course, $faculty, $topic, $item);
+        $legacySnapshot = $this->createQuestionSnapshot($department, $course, $faculty, $topic, $item, true);
+        $healthySnapshot = $this->createQuestionSnapshot($department, $course, $faculty, $topic, $healthyItem);
+        $lowPassSnapshot = $this->createQuestionSnapshot($department, $course, $faculty, $topic, $lowPassItem);
+
+        foreach (['A', 'B', 'B', 'A', 'B', 'B'] as $index => $answer) {
+            $this->createQuestionResponse(
+                $student,
+                $item,
+                $index < 3 ? $firstSnapshot : $secondSnapshot,
+                $answer,
+                now()->subDays(6 - $index),
+            );
+        }
+        $lastUsedAt = now()->subMinutes(10);
+        $this->createQuestionResponse($student, $item, $legacySnapshot, 'A', $lastUsedAt, true);
+        $this->createQuestionResponse($student, $healthyItem, $healthySnapshot, 'One', now()->subMinutes(3));
+        $this->createQuestionResponse($student, $healthyItem, $healthySnapshot, 'Two', now()->subMinutes(2));
+        foreach (['One', 'Two', 'Two', 'Three', 'Four'] as $index => $answer) {
+            $this->createQuestionResponse(
+                $student,
+                $lowPassItem,
+                $lowPassSnapshot,
+                $answer,
+                now()->subMinutes(5 - $index),
+            );
+        }
+
+        $this->actingAs($faculty)
+            ->get(route('admin.question-bank.topics.show', $topic))
+            ->assertOk()
+            ->assertSee('Needs Review')
+            ->assertSee('Healthy')
+            ->assertSee('42.9%', false)
+            ->assertSee('(3/7)', false)
+            ->assertSee('20.0%', false)
+            ->assertSee('Student Pass Rate')
+            ->assertSee('Difficulty Match')
+            ->assertSee('Used in 3 exams')
+            ->assertSee($lastUsedAt->format('M j, Y'))
+            ->assertSee('0% picked')
+            ->assertSee('Unused distractor')
+            ->assertSee('Past exam results remain preserved; edits apply to future exams.')
+            ->assertSee('Added by: Faculty')
+            ->assertSee('Added by: &lt;script&gt;alert(1)&lt;/script&gt;', false)
+            ->assertDontSee('<script>alert(1)</script>', false)
+            ->assertSee('data-bs-title="Automatically classifies the question', false)
+            ->assertSee('data-bs-title="Combines all student responses across every exam and quiz', false)
+            ->assertSee('data-bs-title="Compares your assigned difficulty', false)
+            ->assertSee('data-bs-title="Tracks how many exams or quizzes', false);
+
+        $this->get(route('admin.question-bank.topics.show', [
+            'topic' => $topic,
+            'health' => 'needs_review',
+        ]))
+            ->assertOk()
+            ->assertSee('Which choice is correct?')
+            ->assertSee('Which question has a low pass rate?')
+            ->assertDontSee('Which question has no responses?');
+
+        $this->get(route('admin.question-bank.topics.show', [
+            'topic' => $topic,
+            'health' => 'healthy',
+        ]))
+            ->assertOk()
+            ->assertSee('Which question is healthy?')
+            ->assertDontSee('Which choice is correct?');
+
+        $this->get(route('admin.question-bank.topics.show', [
+            'topic' => $topic,
+            'health' => 'untested',
+        ]))
+            ->assertOk()
+            ->assertSee('Which question has no responses?')
+            ->assertDontSee('Which choice is correct?');
+    }
+
+    public function test_only_peer_faculty_in_the_same_college_and_super_admin_can_flag_questions(): void
+    {
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
+        $creator = User::factory()->create([
+            'name' => 'Question creator',
+            'role' => 'admin',
+            'department_id' => $department->id,
+        ]);
+        $peerFaculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $otherCollege = Department::create(['name' => 'Education', 'code' => 'EDU']);
+        $outsideFaculty = User::factory()->create(['role' => 'admin', 'department_id' => $otherCollege->id]);
+        $superAdmin = User::factory()->create(['role' => 'super-admin']);
+        $topic = $this->createTopic($course, $creator, 'Network security');
+        $item = $this->createQuestionBankItem($course, $creator, $topic, 'Which protocol is secure?');
+
+        $this->actingAs($creator)
+            ->get(route('admin.question-bank.topics.show', $topic))
+            ->assertSee('Added by: Question creator')
+            ->assertDontSee('data-url="'.route('admin.question-bank.revision', $item).'"', false);
+
+        $this->patchJson(route('admin.question-bank.revision', $item), ['needs_revision' => true])
+            ->assertNotFound();
+        $this->assertDatabaseHas('question_bank_items', ['id' => $item->id, 'needs_revision' => false]);
+
+        $this->actingAs($peerFaculty)
+            ->get(route('admin.question-bank.topics.show', $topic))
+            ->assertSee('data-url="'.route('admin.question-bank.revision', $item).'"', false);
+
+        $this->patchJson(route('admin.question-bank.revision', $item), ['needs_revision' => true])
+            ->assertOk()
+            ->assertExactJson([
+                'needs_revision' => true,
+                'quality_status' => 'flagged',
+                'unflagged_quality_status' => 'untested',
+            ]);
+        $this->assertDatabaseHas('question_bank_items', ['id' => $item->id, 'needs_revision' => true]);
+
+        $this->actingAs($outsideFaculty)
+            ->patchJson(route('admin.question-bank.revision', $item), ['needs_revision' => true])
+            ->assertNotFound();
+        $this->assertDatabaseHas('question_bank_items', ['id' => $item->id, 'needs_revision' => true]);
+
+        $student = User::factory()->create(['role' => 'student']);
+        $this->actingAs($student)
+            ->patchJson(route('admin.question-bank.revision', $item), ['needs_revision' => false])
+            ->assertRedirect(route('student.dashboard'));
+        $this->assertDatabaseHas('question_bank_items', ['id' => $item->id, 'needs_revision' => true]);
+
+        $this->actingAs($superAdmin)
+            ->get(route('super-admin.question-bank.index', [
+                'department_id' => $department->id,
+                'course_id' => $course->id,
+                'topic_id' => $topic->id,
+                'health' => 'flagged',
+            ]))
+            ->assertSee('data-url="'.route('super-admin.question-bank.revision', $item).'"', false)
+            ->assertSee('bi-flag-fill', false);
+
+        $this->patchJson(route('super-admin.question-bank.revision', $item), ['needs_revision' => false])
+            ->assertOk()
+            ->assertExactJson([
+                'needs_revision' => false,
+                'quality_status' => 'untested',
+                'unflagged_quality_status' => 'untested',
+            ]);
+        $this->assertDatabaseHas('question_bank_items', ['id' => $item->id, 'needs_revision' => false]);
     }
 
     public function test_faculty_can_create_a_question_for_a_program_in_their_college(): void
@@ -715,10 +895,10 @@ class QuestionBankControllerTest extends TestCase
             ->assertSee($creatorItem->question)
             ->assertSee($facultyItem->question)
             ->assertSee($folderCreator->name)
-            ->assertDontSee(route('admin.question-bank.update', $creatorItem))
-            ->assertDontSee(route('admin.question-bank.destroy', $creatorItem))
-            ->assertSee(route('admin.question-bank.update', $facultyItem))
-            ->assertSee(route('admin.question-bank.destroy', $facultyItem));
+            ->assertDontSee('action="'.route('admin.question-bank.update', $creatorItem).'"', false)
+            ->assertDontSee('action="'.route('admin.question-bank.destroy', $creatorItem).'"', false)
+            ->assertSee('action="'.route('admin.question-bank.update', $facultyItem).'"', false)
+            ->assertSee('action="'.route('admin.question-bank.destroy', $facultyItem).'"', false);
 
         $this->from(route('admin.question-bank.topics.show', $topic))
             ->actingAs($folderCreator)
@@ -891,5 +1071,69 @@ class QuestionBankControllerTest extends TestCase
             'correct_answer' => 'One',
             'topic' => $topic->name,
         ]);
+    }
+
+    private function createQuestionSnapshot(
+        Department $department,
+        Course $course,
+        User $faculty,
+        Topic $topic,
+        QuestionBankItem $item,
+        bool $legacySnapshot = false,
+    ): Question {
+        $exam = Exam::create([
+            'title' => 'Question analytics exam',
+            'topic' => $topic->name,
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+            'created_by' => $faculty->id,
+            'is_general' => false,
+            'is_scheduled_exam' => true,
+            'is_published' => false,
+            'approval_status' => Exam::APPROVAL_STATUS_PENDING,
+            'available_from' => now()->addHour(),
+        ]);
+
+        return Question::create([
+            'test_id' => $exam->id,
+            'question_bank_item_id' => $legacySnapshot ? null : $item->id,
+            'topic_id' => $topic->id,
+            'question' => $item->question,
+            'options' => $item->options,
+            'correct_answer' => $item->correct_answer,
+            'topic' => $topic->name,
+        ]);
+    }
+
+    private function createQuestionResponse(
+        User $student,
+        QuestionBankItem $item,
+        Question $snapshot,
+        string $answer,
+        Carbon $createdAt,
+        bool $legacyResponse = false,
+    ): Result {
+        $answerData = [
+            'question_text' => $item->question,
+            'options' => $item->options,
+            'correct_answer' => $item->correct_answer,
+            'user_answer' => $answer,
+            'is_correct' => $answer === $item->correct_answer,
+        ];
+        if (! $legacyResponse) {
+            $answerData['question_id'] = $snapshot->id;
+            $answerData['question_bank_item_id'] = $item->id;
+        }
+
+        $result = Result::create([
+            'user_id' => $student->id,
+            'test_id' => $snapshot->test_id,
+            'score' => $answer === $item->correct_answer ? 1 : 0,
+            'total_questions' => 1,
+            'answers' => [$answerData],
+        ]);
+        $result->forceFill(['created_at' => $createdAt])->saveQuietly();
+
+        return $result;
     }
 }

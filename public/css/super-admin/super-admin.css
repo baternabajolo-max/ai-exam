@@ -96,10 +96,13 @@
 }
 
 .super-admin-dashboard .system-kpi-label {
+    align-items: center;
     align-self: end;
     color: var(--system-muted);
+    display: flex;
     font-size: .68rem;
     font-weight: 800;
+    gap: .35rem;
     letter-spacing: .08em;
     text-transform: uppercase;
 }

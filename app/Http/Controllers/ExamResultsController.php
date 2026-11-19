@@ -265,7 +265,7 @@ class ExamResultsController extends Controller
             ->latest('created_at')
             ->latest('id')
             ->firstOrFail();
-        $exam->load('questions:id,test_id,topic,difficulty');
+        $exam->load('questions:id,test_id,topic,difficulty,correct_answer');
         $questionsById = $exam->questions->keyBy('id');
         $answers = is_array($result->answers) ? $result->answers : [];
         $items = collect($answers)
@@ -276,6 +276,10 @@ class ExamResultsController extends Controller
                 $selectedAnswer = is_scalar($selectedAnswer) ? trim((string) $selectedAnswer) : '';
                 $questionText = $answer['question_text'] ?? $answer['question'] ?? '';
                 $questionText = is_scalar($questionText) ? (string) $questionText : '';
+                $rawCorrectAnswer = $answer['correct_answer'] ?? null;
+                if (! is_scalar($rawCorrectAnswer) || trim((string) $rawCorrectAnswer) === '') {
+                    $rawCorrectAnswer = $question?->correct_answer;
+                }
                 $rawDifficulty = $answer['difficulty'] ?? $question?->difficulty ?? '';
                 $difficulty = is_scalar($rawDifficulty) ? mb_strtolower(trim((string) $rawDifficulty)) : '';
                 $difficulty = $difficulty === 'medium' ? 'moderate' : $difficulty;
@@ -288,8 +292,8 @@ class ExamResultsController extends Controller
                     'topic' => $topic !== '' ? $topic : 'Uncategorized',
                     'difficulty' => $difficulty,
                     'selected_answer' => $selectedAnswer,
-                    'correct_answer' => is_scalar($answer['correct_answer'] ?? null)
-                        ? (string) $answer['correct_answer']
+                    'correct_answer' => is_scalar($rawCorrectAnswer)
+                        ? (string) $rawCorrectAnswer
                         : '',
                     'explanation' => is_scalar($answer['explanation'] ?? null)
                         ? (string) $answer['explanation']

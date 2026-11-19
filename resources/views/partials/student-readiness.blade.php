@@ -34,7 +34,13 @@
             <div class="row g-3">
                 <div class="col-lg-5">
                     <div class="readiness-panel d-flex flex-column justify-content-center">
-                        <h3 class="readiness-panel-title text-center mb-0">Latest general-test score</h3>
+                        <h3 class="readiness-panel-title text-center mb-0 d-flex align-items-center justify-content-center gap-2">
+                            Latest general-test score
+                            <button type="button" class="kpi-info-trigger" data-kpi-tooltip data-bs-toggle="tooltip" data-bs-placement="top"
+                                    aria-label="About latest general-test score" title="Shows the latest general-test percentage. Topic quiz scores are not included.">
+                                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                            </button>
+                        </h3>
                         <svg class="readiness-gauge" viewBox="0 0 200 125" role="img" aria-labelledby="readiness-gauge-title readiness-gauge-description">
                             <title id="readiness-gauge-title">Latest general-test score</title>
                             <desc id="readiness-gauge-description">

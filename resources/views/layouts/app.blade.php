@@ -68,6 +68,28 @@
         }
         .student-streak-indicator.frozen { background: #eff6ff; border-color: #bfdbfe; color: #2563eb; }
         .student-streak-indicator.inactive { background: #f1f5f9; border-color: #cbd5e1; color: #64748b; }
+        .kpi-info-trigger {
+            align-items: center;
+            background: transparent;
+            border: 0;
+            color: var(--bs-secondary-color, #64748b);
+            cursor: help;
+            display: inline-flex;
+            flex: 0 0 auto;
+            font-size: .9rem;
+            justify-content: center;
+            line-height: 1;
+            padding: .1rem;
+        }
+        .kpi-info-trigger:hover,
+        .kpi-info-trigger:focus-visible {
+            color: var(--bs-primary, #0d6efd);
+        }
+        .kpi-info-trigger:focus-visible {
+            border-radius: 50%;
+            outline: 2px solid currentColor;
+            outline-offset: 2px;
+        }
 
         .admin-nav-search {
             flex: 0 1 18rem;
@@ -1005,6 +1027,10 @@
     <!-- Bootstrap JS Bundle CDN -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        document.querySelectorAll('[data-kpi-tooltip]').forEach((element) => {
+            bootstrap.Tooltip.getOrCreateInstance(element, { container: 'body' });
+        });
+
         window.showToast = function (message, type = 'info', title = '') {
             const allowedTypes = ['success', 'danger', 'warning', 'info'];
             const toastType = allowedTypes.includes(type) ? type : 'info';

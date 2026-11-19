@@ -230,6 +230,7 @@
     .module-ranking-table tbody td { padding: .9rem 1rem; vertical-align: middle; }
     .module-ranking-table tbody tr:last-child td { border-bottom: 0; }
     .module-ranking-table tbody tr[hidden] { display: none !important; }
+    .module-ranking-table [hidden] { display: none !important; }
     .module-ranking-table tbody tr.module-rank-divider td { border-top: 2px solid rgba(234, 179, 8, .45); }
     .module-tabular { font-variant-numeric: tabular-nums; }
 
@@ -490,17 +491,40 @@
         padding: 0;
         width: 100%;
     }
-    .module-calendar-cell[data-level="1"] { background: #fef3c7; }
-    .module-calendar-cell[data-level="2"] { background: #fcd34d; color: #422006; }
-    .module-calendar-cell[data-level="3"] { background: #d6a11d; color: #fff; }
-    .module-calendar-cell[data-level="4"] { background: #4a0e17; color: #fff; }
+    .module-calendar-cell[data-level="1"],
+    .module-calendar-legend-swatch[data-level="1"] { background: #fca5a5; color: #7f1d1d; }
+    .module-calendar-cell[data-level="2"],
+    .module-calendar-legend-swatch[data-level="2"] { background: #fdba74; color: #7c2d12; }
+    .module-calendar-cell[data-level="3"],
+    .module-calendar-legend-swatch[data-level="3"] { background: #86efac; color: #14532d; }
+    .module-calendar-cell[data-level="4"],
+    .module-calendar-legend-swatch[data-level="4"] { background: #16a34a; color: #fff; }
     .module-calendar-cell--selected {
-        background: #4a0e17;
-        box-shadow: inset 0 0 0 2px #92400e;
-        color: #fff;
+        outline: 2px solid #4a0e17;
+        outline-offset: 1px;
     }
     .module-calendar-cell--empty { background: transparent; }
     .module-calendar-cell--empty:focus-visible { outline: none; }
+    .module-calendar-legend {
+        align-items: center;
+        color: #6b5558;
+        display: flex;
+        flex-wrap: wrap;
+        font-size: .75rem;
+        gap: .45rem;
+        justify-content: flex-end;
+        margin: .85rem auto 0;
+        max-width: 28rem;
+    }
+    .module-calendar-legend[hidden] { display: none; }
+    .module-calendar-legend-swatch {
+        border: 1px solid rgb(71 85 105 / 12%);
+        border-radius: .2rem;
+        display: inline-block;
+        height: 1rem;
+        width: 1rem;
+    }
+    .module-calendar-legend-none { background: #f3f4f6; }
     .module-chart-error { color: #b91c1c; }
 
     #moduleStudentActivityModal .modal-dialog,
@@ -775,7 +799,7 @@
                                         <button type="button" class="module-info-tooltip" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-container="body"
                                                 aria-label="About verified study time" title="Counts active reading time (capped at 30m per topic) once at least 1 quiz attempt is completed on that topic. Inactive tabs and repeated same-spot clicks pause automatically.">ⓘ</button>
                                     </th>
-                                    <th>
+                                    <th data-topic-completion-header>
                                         Topics Completed
                                         <button type="button" class="module-info-tooltip" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-container="body"
                                                 aria-label="About topic completion" title="Marked Completed once a student reviews the topic (>= 5m) and scores >= 75% on its quiz.">ⓘ</button>
@@ -817,7 +841,7 @@
                                         </td>
                                     </tr>
                                 @empty
-                                    <tr><td class="py-5 text-center text-secondary" colspan="8">No students are enrolled in this module's academic program.</td></tr>
+                                    <tr><td class="py-5 text-center text-secondary" colspan="8" data-student-empty-state>No students are enrolled in this module's academic program.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -899,6 +923,17 @@
                                         <div id="moduleActivityCalendar" class="module-activity-calendar module-chart-view" aria-label="Daily study activity calendar" hidden></div>
                                         <div id="moduleTopicsActivityChart" class="module-chart-bars module-chart-view" role="img" aria-label="Reviewed time by topic chart" hidden></div>
                                     </div>
+                                </div>
+                                <div id="moduleCalendarLegend" class="module-calendar-legend" role="group"
+                                     aria-label="Daily study time legend. Red means less study time; green means more." hidden>
+                                    <span>No activity</span>
+                                    <span class="module-calendar-legend-swatch module-calendar-legend-none" aria-label="No activity"></span>
+                                    <span>Low time</span>
+                                    <span class="module-calendar-legend-swatch" data-level="1" title="Under 10 minutes" aria-label="Under 10 minutes"></span>
+                                    <span class="module-calendar-legend-swatch" data-level="2" title="10 to 29 minutes" aria-label="10 to 29 minutes"></span>
+                                    <span class="module-calendar-legend-swatch" data-level="3" title="30 to 59 minutes" aria-label="30 to 59 minutes"></span>
+                                    <span class="module-calendar-legend-swatch" data-level="4" title="60 minutes or more" aria-label="60 minutes or more"></span>
+                                    <span>Most time</span>
                                 </div>
                                 <p class="small text-secondary mt-2 mb-0" id="moduleCalendarLabel" aria-live="polite"></p>
                             </div>
@@ -1129,6 +1164,8 @@
         const studentRows = Array.from(document.querySelectorAll('[data-review-student]'));
         const studentSearch = document.getElementById('moduleStudentSearch');
         const studentTopicFilter = document.getElementById('moduleStudentTopicFilter');
+        const studentTopicCompletionHeader = document.querySelector('[data-topic-completion-header]');
+        const studentEmptyStateCell = studentRowsContainer.querySelector('[data-student-empty-state]');
         const studentSort = document.getElementById('moduleStudentSort');
         const viewAllStudents = document.getElementById('viewAllModuleStudents');
         let showAllLeaderboard = false;
@@ -1251,6 +1288,11 @@
         function updateStudentRows() {
             const topicId = studentTopicFilter.value;
             const searchTerm = studentSearch.value.trim().toLocaleLowerCase();
+            const showTopicCompletion = topicId === 'all';
+            studentTopicCompletionHeader.hidden = !showTopicCompletion;
+            if (studentEmptyStateCell) {
+                studentEmptyStateCell.colSpan = showTopicCompletion ? 8 : 7;
+            }
             const rankedRows = studentRows.map((row) => ({
                 row,
                 stats: getStudentStats(row, topicId),
@@ -1270,9 +1312,9 @@
                 const stats = item.stats;
                 const status = getStatus(stats);
                 row.querySelector('[data-verified-time]').textContent = formatStudyDuration(stats.verified_seconds);
-                row.querySelector('[data-topic-completion]').textContent = topicId === 'all'
-                    ? `${stats.topics_completed} / ${stats.topic_count} Topics`
-                    : stats.status;
+                const topicCompletionCell = row.querySelector('[data-topic-completion]');
+                topicCompletionCell.hidden = !showTopicCompletion;
+                topicCompletionCell.textContent = `${stats.topics_completed} / ${stats.topic_count} Topics`;
                 row.querySelector('[data-quiz-attempts]').textContent = String(stats.quiz_attempts);
                 row.querySelector('[data-last-active]').textContent = formatLastActive(stats.last_active_at);
                 applyStatusPill(row.querySelector('[data-status-pill]'), status);
@@ -1336,6 +1378,7 @@
         const chartYAxis = document.getElementById('moduleChartYAxis');
         const monthlyChart = document.getElementById('moduleMonthlyActivityChart');
         const activityCalendar = document.getElementById('moduleActivityCalendar');
+        const calendarLegend = document.getElementById('moduleCalendarLegend');
         const calendarLabel = document.getElementById('moduleCalendarLabel');
         const topicsChart = document.getElementById('moduleTopicsActivityChart');
         const activityError = document.getElementById('moduleActivityError');
@@ -1527,6 +1570,7 @@
 
             const isCalendar = stage === 'days';
             activityChartLayout.classList.toggle('is-calendar', isCalendar);
+            calendarLegend.hidden = !isCalendar;
             const stageScale = activityChartScales[stage];
             chartYAxis.hidden = isCalendar || !stageScale;
             chartUnitLabel.hidden = isCalendar || !stageScale;

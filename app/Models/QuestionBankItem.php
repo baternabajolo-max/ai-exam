@@ -26,6 +26,7 @@ class QuestionBankItem extends Model
         'image_path',
         'difficulty',
         'is_active',
+        'needs_revision',
     ];
 
     protected function casts(): array
@@ -33,6 +34,7 @@ class QuestionBankItem extends Model
         return [
             'options' => 'array',
             'is_active' => 'boolean',
+            'needs_revision' => 'boolean',
         ];
     }
 
