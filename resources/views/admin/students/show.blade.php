@@ -645,6 +645,80 @@
                     </div>
                 </section>
 
+                <section class="performance-card mb-4" aria-labelledby="examination-history-title">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                        <div>
+                            <h3 id="examination-history-title" class="h5 fw-bold text-slate-900 mb-1">Examination history</h3>
+                            <p class="text-secondary small mb-0">Scheduled exam attempts with answer review and retake controls.</p>
+                        </div>
+                        <span class="badge rounded-pill bg-light text-secondary border">
+                            {{ $examHistory->sum(fn ($attempts) => $attempts->count()) }} attempts
+                        </span>
+                    </div>
+                    <div class="row g-2">
+                        @forelse ($examHistory as $attempts)
+                            @php($exam = $attempts->first()->test)
+                            @if ($exam)
+                                @php($retakeGrant = $exam->retakeGrants->first())
+                                @foreach ($attempts as $result)
+                                    @php($scorePercentage = $result->total_questions > 0 ? (int) round(($result->score / $result->total_questions) * 100) : 0)
+                                    <div class="col-md-6">
+                                        <article class="test-row d-flex align-items-center gap-3 h-100">
+                                            <span class="badge rounded-circle bg-warning-subtle text-dark border border-warning-subtle fw-bold d-flex align-items-center justify-content-center flex-shrink-0" style="width: 28px; height: 28px;">
+                                                {{ $attempts->count() - $loop->index }}
+                                            </span>
+                                            <div class="flex-grow-1 min-w-0">
+                                                <h4 class="small fw-semibold text-slate-900 text-truncate mb-1" title="{{ $exam->title }}">
+                                                    {{ $exam->title }}
+                                                </h4>
+                                                <small class="text-secondary">
+                                                    {{ $exam->course?->name ?? 'Unknown program' }} · Attempt {{ $attempts->count() - $loop->index }} · {{ $result->created_at->format('M d, Y · h:i A') }}
+                                                </small>
+                                                @if ($loop->first && $retakeGrant)
+                                                    <span class="badge text-bg-success ms-1">Retake activated</span>
+                                                @endif
+                                            </div>
+                                            <div class="text-end flex-shrink-0">
+                                                <strong class="{{ $scorePercentage >= 75 ? 'text-success' : 'text-danger' }}">{{ $scorePercentage }}%</strong>
+                                                <small class="d-block text-secondary">{{ $result->score }}/{{ $result->total_questions }}</small>
+                                            </div>
+                                            <div class="d-flex flex-column align-items-center gap-2 flex-shrink-0">
+                                                <a
+                                                    class="btn btn-sm btn-outline-primary rounded-circle d-inline-flex align-items-center justify-content-center"
+                                                    style="width: 36px; height: 36px;"
+                                                    href="{{ $isFacultyViewer
+                                                        ? route('admin.students.results.show', ['student' => $student, 'result' => $result])
+                                                        : route('super-admin.students.results.show', ['student' => $student, 'result' => $result]) }}"
+                                                    aria-label="View {{ $exam->title }} attempt answers"
+                                                    title="View test"
+                                                >
+                                                    <i class="bi bi-eye" aria-hidden="true"></i>
+                                                </a>
+                                                @if ($loop->first && $exam->isAvailableAt() && ! $retakeGrant)
+                                                    <form
+                                                        action="{{ route($isFacultyViewer ? 'admin.students.tests.retake' : 'super-admin.students.tests.retake', ['student' => $student, 'test' => $exam]) }}"
+                                                        method="POST"
+                                                        data-confirm-title="Activate one retake?"
+                                                        data-confirm-text="This gives the student one additional attempt at this examination. Another attempt requires another activation."
+                                                        data-confirm-button="Activate retake"
+                                                    >
+                                                        @csrf
+                                                        <button class="btn btn-sm btn-outline-success rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 36px; height: 36px;" type="submit" aria-label="Activate retake for {{ $exam->title }}" title="Activate retake">
+                                                            <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+                                                        </button>
+                                                    </form>
+                                                @endif
+                                            </div>
+                                        </article>
+                                    </div>
+                                @endforeach
+                            @endif
+                        @empty
+                            <p class="text-secondary small mb-0 py-3 text-center">No scheduled examination attempts yet.</p>
+                        @endforelse
+                    </div>
+                </section>
+
         </section>
 
         <!-- Modules Section -->

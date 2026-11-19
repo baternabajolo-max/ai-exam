@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Course;
 use App\Models\Department;
 use App\Models\Result;
 use App\Models\StudySession;
@@ -14,18 +15,43 @@ use Illuminate\View\View;
 
 class SuperAdminController extends Controller
 {
-    public function monitoring(): View
+    public function monitoring(Request $request): View
     {
+        $validated = $request->validate([
+            'course_id' => ['nullable', 'integer', 'exists:courses,id'],
+        ]);
+        $selectedCourseId = isset($validated['course_id']) ? (int) $validated['course_id'] : null;
+        $selectedCourse = $selectedCourseId === null
+            ? null
+            : Course::query()->findOrFail($selectedCourseId);
+        $courses = Course::query()
+            ->with('department:id,name')
+            ->orderBy('name')
+            ->get(['id', 'name', 'department_id']);
         $faculties = User::query()
             ->where('role', 'admin')
+            ->when($selectedCourseId !== null, fn ($query) => $query->where(function ($query) use ($selectedCourseId): void {
+                $query->where('course_id', $selectedCourseId)
+                    ->orWhereHas('questionBankItems', fn ($query) => $query->where('course_id', $selectedCourseId));
+            }))
             ->with([
                 'department:id,name',
+                'course:id,name',
             ])
-            ->withCount('questionBankItems')
+            ->withCount([
+                'questionBankItems' => fn ($query) => $query->when(
+                    $selectedCourseId !== null,
+                    fn ($query) => $query->where('course_id', $selectedCourseId),
+                ),
+            ])
             ->orderBy('name')
             ->get();
         $recentAssessments = Result::query()
             ->whereHas('test', fn ($query) => $query->where('is_scheduled_exam', true))
+            ->when($selectedCourseId !== null, fn ($query) => $query->whereHas(
+                'test',
+                fn ($query) => $query->where('course_id', $selectedCourseId),
+            ))
             ->with([
                 'user:id,name,course_id',
                 'user.course:id,name',
@@ -36,7 +62,13 @@ class SuperAdminController extends Controller
             ->take(25)
             ->get();
 
-        return view('super-admin.monitoring.index', compact('faculties', 'recentAssessments'));
+        return view('super-admin.monitoring.index', compact(
+            'faculties',
+            'recentAssessments',
+            'courses',
+            'selectedCourseId',
+            'selectedCourse',
+        ));
     }
 
     public function dashboard(Request $request): View|RedirectResponse
@@ -45,14 +77,24 @@ class SuperAdminController extends Controller
             'period' => ['sometimes', 'in:7,30,90,custom'],
             'start_date' => ['required_if:period,custom', 'nullable', 'date_format:Y-m-d', 'before_or_equal:end_date'],
             'end_date' => ['required_if:period,custom', 'nullable', 'date_format:Y-m-d', 'after_or_equal:start_date', 'before_or_equal:today'],
-            'college_id' => ['nullable', 'integer', 'exists:departments,id'],
+            'college_id' => ['nullable', 'required_with:course_id', 'integer', 'exists:departments,id'],
+            'course_id' => ['nullable', 'integer', 'exists:courses,id'],
             'student_search' => ['nullable', 'string', 'max:100'],
         ]);
         $studentSearch = trim($validatedPeriod['student_search'] ?? '');
         $period = (string) ($validatedPeriod['period'] ?? '30');
-        $selectedDepartmentId = isset($validatedPeriod['college_id'])
-            ? (int) $validatedPeriod['college_id']
-            : null;
+        $requestedDepartmentId = isset($validatedPeriod['college_id']) ? (int) $validatedPeriod['college_id'] : null;
+        $selectedCourseId = isset($validatedPeriod['course_id']) ? (int) $validatedPeriod['course_id'] : null;
+        $selectedCourse = $selectedCourseId === null
+            ? null
+            : Course::query()->with('department:id,name')->findOrFail($selectedCourseId);
+        abort_if(
+            $selectedCourse !== null
+                && $requestedDepartmentId !== null
+                && $selectedCourse->department_id !== $requestedDepartmentId,
+            404,
+        );
+        $selectedDepartmentId = $selectedCourse?->department_id ?? $requestedDepartmentId;
         $periodStartDate = $period === 'custom' ? $validatedPeriod['start_date'] : null;
         $periodEndDate = $period === 'custom' ? $validatedPeriod['end_date'] : null;
         $periodEnd = $period === 'custom'
@@ -72,9 +114,17 @@ class SuperAdminController extends Controller
         $periodLabel = $period === 'custom'
             ? $periodStart->format('M j, Y').' - '.$periodEnd->format('M j, Y')
             : 'Last '.$periodDays.' days';
-        $departments = Department::withCount(['users' => function ($query) {
-            $query->where('role', 'student');
+        $departments = Department::withCount(['users' => function ($query) use ($selectedCourseId): void {
+            $query->where('role', 'student')
+                ->when($selectedCourseId !== null, fn ($query) => $query->where('course_id', $selectedCourseId));
         }])->orderBy('name')->get();
+        $courses = $requestedDepartmentId === null
+            ? collect()
+            : Course::query()
+                ->where('department_id', $requestedDepartmentId)
+                ->with('department:id,name')
+                ->orderBy('name')
+                ->get(['id', 'name', 'department_id']);
         $selectedDepartment = $departments->firstWhere('id', $selectedDepartmentId);
         $matchingStudents = collect();
         if ($studentSearch !== '') {
@@ -82,6 +132,7 @@ class SuperAdminController extends Controller
                 ->select(['id', 'name', 'email', 'student_id_number', 'department_id', 'course_id'])
                 ->where('role', 'student')
                 ->when($selectedDepartmentId !== null, fn ($query) => $query->where('department_id', $selectedDepartmentId))
+                ->when($selectedCourseId !== null, fn ($query) => $query->where('course_id', $selectedCourseId))
                 ->where(function ($query) use ($studentSearch): void {
                     $query->where('name', 'like', "{$studentSearch}%")
                         ->orWhere('email', 'like', "{$studentSearch}%")
@@ -103,6 +154,10 @@ class SuperAdminController extends Controller
                 $selectedDepartmentId !== null,
                 fn ($query) => $query->where('department_id', $selectedDepartmentId),
             )
+            ->when($selectedCourseId !== null, fn ($query) => $query->where(function ($query) use ($selectedCourseId): void {
+                $query->where('course_id', $selectedCourseId)
+                    ->orWhereHas('questionBankItems', fn ($query) => $query->where('course_id', $selectedCourseId));
+            }))
             ->count();
         $totalStudents = (int) $dashboardDepartments->sum('users_count');
         $monthStart = $periodEnd->startOfMonth()->subMonths(11);
@@ -111,8 +166,9 @@ class SuperAdminController extends Controller
             ->all();
         $registrationMonths = User::query()
             ->where('role', 'student')
+            ->when($selectedCourseId !== null, fn ($query) => $query->where('course_id', $selectedCourseId))
             ->whereBetween('created_at', [$monthStart, $periodEnd])
-            ->get(['department_id', 'created_at'])
+            ->get(['department_id', 'course_id', 'created_at'])
             ->groupBy('department_id')
             ->map(fn ($registrations) => $registrations->groupBy(
                 fn (User $student): string => $student->created_at->format('Y-m')
@@ -120,7 +176,7 @@ class SuperAdminController extends Controller
         $fallbackColors = ['#2563eb', '#059669', '#d97706', '#7c3aed', '#0891b2', '#be123c'];
         $departmentDatasets = $dashboardDepartments
             ->values()
-            ->map(function (Department $department, int $index) use ($monthStart, $registrationMonths, $fallbackColors): array {
+            ->map(function (Department $department, int $index) use ($monthStart, $registrationMonths, $fallbackColors, $selectedCourse): array {
                 $departmentColor = $department->color_theme;
                 if (! is_string($departmentColor) || preg_match('/^#[0-9a-fA-F]{6}$/', $departmentColor) !== 1) {
                     $departmentColor = $fallbackColors[$index % count($fallbackColors)];
@@ -128,7 +184,7 @@ class SuperAdminController extends Controller
                 $monthlyRegistrations = $registrationMonths[$department->id] ?? collect();
 
                 return [
-                    'label' => $department->name,
+                    'label' => $selectedCourse?->name ?? $department->name,
                     'data' => collect(range(0, 11))
                         ->map(fn (int $month): int => ($monthlyRegistrations[$monthStart->addMonths($month)->format('Y-m')] ?? collect())->count())
                         ->all(),
@@ -141,14 +197,17 @@ class SuperAdminController extends Controller
             })
             ->all();
 
-        $resultsForPeriod = function (CarbonImmutable $start, CarbonImmutable $end) {
+        $resultsForPeriod = function (CarbonImmutable $start, CarbonImmutable $end) use ($selectedCourseId) {
             return Result::query()
                 ->whereBetween('created_at', [$start, $end])
-                ->whereHas('test', fn ($query) => $query->whereNotNull('department_id'))
+                ->whereHas('test', fn ($query) => $query
+                    ->whereNotNull('department_id')
+                    ->when($selectedCourseId !== null, fn ($query) => $query->where('course_id', $selectedCourseId)))
                 ->whereHas('user', fn ($query) => $query
                     ->where('role', 'student')
-                    ->whereNotNull('department_id'))
-                ->with(['test:id,department_id,is_general', 'user:id,department_id'])
+                    ->whereNotNull('department_id')
+                    ->when($selectedCourseId !== null, fn ($query) => $query->where('course_id', $selectedCourseId)))
+                ->with(['test:id,department_id,course_id,is_general', 'user:id,department_id,course_id'])
                 ->latest()
                 ->get(['id', 'user_id', 'test_id', 'score', 'total_questions', 'created_at']);
         };
@@ -168,8 +227,9 @@ class SuperAdminController extends Controller
             ->where('active_seconds', '>', 0)
             ->whereHas('student', fn ($query) => $query
                 ->where('role', 'student')
-                ->whereNotNull('department_id'))
-            ->with('student:id,department_id')
+                ->whereNotNull('department_id')
+                ->when($selectedCourseId !== null, fn ($query) => $query->where('course_id', $selectedCourseId)))
+            ->with('student:id,department_id,course_id')
             ->get(['id', 'user_id', 'started_at', 'active_seconds']);
         foreach ($activeStudySessions as $activeStudySession) {
             if ($activeStudySession->student !== null) {
@@ -193,6 +253,7 @@ class SuperAdminController extends Controller
             $activeStudentsByDepartment,
             $scoreForResult,
             $fallbackColors,
+            $selectedCourse,
         ): array {
             $currentScores = $currentGeneralStudentResults
                 ->filter(fn (Result $result): bool => $result->test->department_id === $department->id)
@@ -206,7 +267,7 @@ class SuperAdminController extends Controller
 
             return [
                 'id' => $department->id,
-                'name' => $department->name,
+                'name' => $selectedCourse?->name ?? $department->name,
                 'color' => $color,
                 'students' => $department->users_count,
                 'active_students' => count($activeStudentsByDepartment[$department->id] ?? []),
@@ -229,6 +290,9 @@ class SuperAdminController extends Controller
             'totalAdmins',
             'totalStudents',
             'departments',
+            'courses',
+            'selectedCourse',
+            'selectedCourseId',
             'selectedDepartment',
             'selectedDepartmentId',
             'studentSearch',

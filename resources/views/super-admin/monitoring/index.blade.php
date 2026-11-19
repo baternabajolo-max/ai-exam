@@ -6,7 +6,10 @@
         <div>
             <span class="badge text-bg-primary mb-2">Institution oversight</span>
             <h1 class="h3 mb-1">Faculty &amp; Program Monitoring</h1>
-            <p class="text-muted mb-0">Review every Faculty account, each separate Question Bank, and recent examination submissions.</p>
+            <p class="text-muted mb-0">
+                Review Faculty accounts, Question Banks, and recent examination submissions
+                @if($selectedCourse) for {{ $selectedCourse->name }} @else across academic programs @endif.
+            </p>
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a href="{{ route('super-admin.question-bank.index') }}" class="btn btn-outline-primary">
@@ -17,6 +20,28 @@
             </a>
         </div>
     </div>
+
+    <form method="GET" action="{{ route('super-admin.monitoring') }}" class="card card-body shadow-sm mb-4">
+        <div class="row align-items-end g-3">
+            <div class="col-md-6 col-lg-4">
+                <label for="monitoring-program-filter" class="form-label fw-semibold">Academic program</label>
+                <select id="monitoring-program-filter" name="course_id" class="form-select">
+                    <option value="">All programs</option>
+                    @foreach($courses as $course)
+                        <option value="{{ $course->id }}" @selected((string) $selectedCourseId === (string) $course->id)>
+                            {{ $course->name }} · {{ $course->department->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary">Apply filter</button>
+                @if($selectedCourseId)
+                    <a href="{{ route('super-admin.monitoring') }}" class="btn btn-outline-secondary">Clear</a>
+                @endif
+            </div>
+        </div>
+    </form>
 
     <section class="row row-cols-1 row-cols-sm-3 g-3 mb-4" aria-label="Monitoring summary">
         <div class="col">
@@ -47,19 +72,19 @@
 
     <section class="card shadow-sm mb-4" aria-labelledby="faculty-monitoring-heading">
         <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2 py-3">
-            <div><h2 class="h5 mb-1" id="faculty-monitoring-heading">All Faculty</h2><p class="small text-muted mb-0">College assignment, individual Question Bank size, and account status.</p></div>
+            <div><h2 class="h5 mb-1" id="faculty-monitoring-heading">{{ $selectedCourse ? 'Faculty for '.$selectedCourse->name : 'All Faculty' }}</h2><p class="small text-muted mb-0">Academic program association, individual Question Bank size, and account status.</p></div>
             <span class="badge text-bg-light">{{ $faculties->count() }} total</span>
         </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
-                    <tr><th scope="col">Faculty member</th><th scope="col">College</th><th scope="col">Own Question Bank</th><th scope="col">Account</th><th scope="col">Last active</th></tr>
+                    <tr><th scope="col">Faculty member</th><th scope="col">Program</th><th scope="col">Own Question Bank</th><th scope="col">Account</th><th scope="col">Last active</th></tr>
                 </thead>
                 <tbody>
                     @forelse ($faculties as $faculty)
                         <tr>
                             <td><div class="fw-semibold">{{ $faculty->name }}</div><div class="small text-muted">{{ $faculty->email }}</div></td>
-                            <td>{{ $faculty->department->name ?? '—' }}</td>
+                            <td>{{ $selectedCourse?->name ?? $faculty->course?->name ?? 'Varies by Question Bank' }}</td>
                             <td>
                                 <a class="btn btn-sm btn-outline-primary" href="{{ route('super-admin.question-bank.index', ['author_id' => $faculty->id]) }}">
                                     <i class="bi bi-journal-text me-1" aria-hidden="true"></i>

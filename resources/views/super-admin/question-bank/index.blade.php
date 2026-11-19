@@ -321,6 +321,10 @@
                     <div class="admin-bank__question-copy">
                         <div class="small text-muted mb-1">{{ $item->author->name ?? 'Former Faculty' }} · {{ $item->course->name ?? 'Unknown program' }}</div>
                         <h3 class="admin-bank__question-text h6 fw-semibold mb-0">{{ $item->question }}</h3>
+                        <span class="badge rounded-pill {{ $item->difficulty === 'hard' ? 'text-bg-danger' : ($item->difficulty === 'easy' ? 'text-bg-success' : 'text-bg-warning') }} mt-2">{{ ucfirst($item->difficulty ?? 'moderate') }} difficulty</span>
+                        @if ($item->image_path)
+                            <img src="{{ asset('storage/'.$item->image_path) }}" alt="Question illustration" class="img-fluid rounded border mt-2" style="max-height: 9rem; object-fit: contain;">
+                        @endif
                     </div>
                 </div>
                 <button
@@ -350,6 +354,10 @@
                         <div class="admin-bank__filter-field mb-3">
                             <div class="small text-uppercase text-muted fw-bold mb-2">Prompt</div>
                             <h3 class="h6 fw-semibold text-break mb-0">{{ $item->question }}</h3>
+                            <div class="mt-2"><span class="badge rounded-pill {{ $item->difficulty === 'hard' ? 'text-bg-danger' : ($item->difficulty === 'easy' ? 'text-bg-success' : 'text-bg-warning') }}">{{ ucfirst($item->difficulty ?? 'moderate') }} difficulty</span></div>
+                            @if ($item->image_path)
+                                <img src="{{ asset('storage/'.$item->image_path) }}" alt="Question illustration" class="img-fluid rounded border mt-3">
+                            @endif
                         </div>
                         <div class="small text-uppercase text-muted fw-bold mb-2">Answer choices</div>
                         <ol class="list-unstyled d-grid gap-2 mb-0">

@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
+@php($testRoutePrefix = auth()->user()->role === 'admin' ? 'admin' : 'super-admin')
 <style>
     .exam-list__hero {
         background:
@@ -10,7 +11,10 @@
         border-radius: 1.25rem;
         box-shadow: 0 1rem 2rem rgb(35 54 115 / 16%);
         color: #fff;
+        isolation: isolate;
+        overflow: hidden;
         padding: clamp(1.25rem, 3vw, 2rem);
+        position: relative;
     }
 
     .exam-list__eyebrow {
@@ -32,6 +36,14 @@
         --bs-table-bg: #fff;
         --bs-table-color: #1e293b;
         min-width: 900px;
+    }
+
+    .exam-list__table tbody tr {
+        transition: background-color .18s ease;
+    }
+
+    .exam-list__table tbody tr:hover {
+        --bs-table-bg: #f8faff;
     }
 
     .exam-list__table thead th {
@@ -56,11 +68,30 @@
         min-width: 12rem;
     }
 
+    .exam-list__availability time {
+        white-space: nowrap;
+    }
+
     .exam-list__status {
         border: 1px solid transparent;
         font-size: .75rem;
         font-weight: 700;
         padding: .45rem .7rem;
+    }
+
+    .exam-list__metric {
+        align-items: center;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        border-radius: .65rem;
+        color: #334155;
+        display: inline-flex;
+        font-size: .85rem;
+        font-weight: 700;
+        justify-content: center;
+        min-height: 2rem;
+        min-width: 2.25rem;
+        padding: .15rem .5rem;
     }
 
     .exam-list__status--active {
@@ -85,6 +116,10 @@
     }
 
     .exam-list__actions {
+        align-items: flex-end;
+        display: flex;
+        flex-direction: column;
+        gap: .45rem;
         min-width: 9.5rem;
     }
 
@@ -214,8 +249,18 @@
         border-color: #334155;
     }
 
+    html[data-bs-theme="dark"] .exam-list__table tbody tr:hover {
+        --bs-table-bg: #273449;
+    }
+
     html[data-bs-theme="dark"] .exam-list__availability {
         color: #cbd5e1;
+    }
+
+    html[data-bs-theme="dark"] .exam-list__metric {
+        background: #273449;
+        border-color: #475569;
+        color: #e2e8f0;
     }
 
     html[data-bs-theme="dark"] .exam-list__status--active {
@@ -252,7 +297,7 @@
     }
 </style>
 
-<main class="container exam-list">
+<main class="container exam-list py-4 py-lg-5">
     <header class="exam-list__hero d-flex flex-wrap justify-content-between align-items-center gap-4 mb-4">
         <div>
             <div class="exam-list__eyebrow mb-2">Assessment management</div>
@@ -276,47 +321,99 @@
         @endif
     </header>
 
-    @if (session('success'))
-        <div class="alert alert-success" role="status">{{ session('success') }}</div>
-    @endif
-    @if ($errors->any())
-        <div class="alert alert-danger" role="alert">
-            <ul class="mb-0">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
-        </div>
-    @endif
-
     <section class="exam-list__table-wrap" aria-label="Examination list">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 px-md-4 py-3 border-bottom">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 px-3 px-md-4 py-3 border-bottom">
             <div>
                 <h2 class="h5 fw-bold mb-1">Examination schedule</h2>
-                <p class="small text-muted mb-0">Review status, availability, and participation at a glance.</p>
+                <p class="small text-muted mb-0">
+                    Showing {{ $tests->firstItem() ?? 0 }}–{{ $tests->lastItem() ?? 0 }} of {{ $tests->total() }} examinations.
+                    Review status, availability, and results at a glance.
+                </p>
             </div>
-            <span class="badge rounded-pill text-bg-light border px-3 py-2">{{ $tests->total() }} total</span>
+            <div class="d-flex align-items-center gap-2">
+                @if (auth()->user()->role === 'admin')
+                    <form method="GET" action="{{ route('admin.tests.index') }}">
+                        <label class="visually-hidden" for="exam-program-filter">Filter examinations by program</label>
+                        <select
+                            id="exam-program-filter"
+                            name="course_id"
+                            class="form-select form-select-sm"
+                            onchange="this.form.requestSubmit()"
+                        >
+                            <option value="">All programs in your college</option>
+                            @foreach ($facultyCourses as $course)
+                                <option value="{{ $course->id }}" @selected((string) $selectedCourseId === (string) $course->id)>{{ $course->name }}</option>
+                            @endforeach
+                        </select>
+                        <noscript><button class="btn btn-sm btn-outline-primary mt-2" type="submit">Apply filter</button></noscript>
+                    </form>
+                @endif
+                <span class="badge rounded-pill text-bg-light border px-3 py-2">{{ $tests->total() }} total</span>
+                @if ($tests->total() > 10)
+                    <a
+                        class="btn btn-sm btn-outline-primary rounded-pill px-3"
+                        href="{{ route($testRoutePrefix.'.tests.index', array_filter([
+                            'view_all' => $showAll ? null : 1,
+                            'course_id' => $selectedCourseId,
+                        ], fn ($value) => $value !== null)) }}"
+                    >
+                        {{ $showAll ? 'Show first 10' : 'View all' }}
+                    </a>
+                @endif
+            </div>
         </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0 exam-list__table">
                 <thead class="table-light">
-                    <tr><th scope="col">Examination</th><th scope="col">Program</th><th scope="col">Status</th><th scope="col">Availability</th><th scope="col">Questions</th><th scope="col">Results</th><th scope="col">Created by</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr>
+                    <tr><th scope="col">Examination</th><th scope="col">Program</th><th scope="col">Status</th><th scope="col">Availability</th><th scope="col">Questions</th><th scope="col">Results</th><th scope="col">Created by</th><th scope="col" class="text-end">Actions</th></tr>
                 </thead>
                 <tbody>
                     @forelse ($tests as $test)
                         @php($status = $test->scheduleStatus())
+                        @php($canManage = $test->isEditableBy(auth()->user()) && $test->results_count === 0)
                         <tr>
-                            <td data-label="Examination"><div class="fw-semibold">{{ $test->title }}</div><div class="small text-muted">{{ $test->topic }}</div></td>
+                            <td data-label="Examination">
+                                <div class="fw-semibold">{{ $test->title }}</div>
+                                <div class="small text-muted">{{ $test->topic }}</div>
+                                @if ($test->approval_status === 'rejected' && (int) $test->created_by === (int) auth()->id() && $test->rejection_comment)
+                                    <div class="small text-danger mt-1">Admin comment: {{ $test->rejection_comment }}</div>
+                                @endif
+                            </td>
                             <td data-label="Program">{{ $test->course->name ?? 'Unknown program' }}</td>
                             <td data-label="Status"><span class="badge rounded-pill exam-list__status exam-list__status--{{ strtolower($status) }}">{{ $status }}</span></td>
                             <td data-label="Availability" class="exam-list__availability">
                                 @if ($test->is_published)
-                                    <div class="small fw-semibold"><i class="bi bi-calendar-event me-1 text-primary" aria-hidden="true"></i>Opens {{ $test->available_from?->format('M j, Y g:i A') ?? 'immediately' }}</div>
-                                    @if ($test->available_until)<div class="small text-muted mt-1"><i class="bi bi-calendar-x me-1" aria-hidden="true"></i>Closes {{ $test->available_until->format('M j, Y g:i A') }}</div>@endif
+                                    <div class="small fw-semibold">
+                                        <i class="bi bi-calendar-event me-1 text-primary" aria-hidden="true"></i>
+                                        Opens
+                                        @if ($test->available_from)
+                                            <time datetime="{{ $test->available_from->toIso8601String() }}">{{ $test->available_from->format('M j, Y · g:i A') }}</time>
+                                        @else
+                                            immediately
+                                        @endif
+                                    </div>
+                                    @if ($test->available_until)
+                                        <div class="small text-muted mt-1">
+                                            <i class="bi bi-calendar-x me-1" aria-hidden="true"></i>
+                                            Closes <time datetime="{{ $test->available_until->toIso8601String() }}">{{ $test->available_until->format('M j, Y · g:i A') }}</time>
+                                        </div>
+                                    @endif
                                 @else
                                     <span class="small text-muted"><i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>Unavailable until approved</span>
                                 @endif
                             </td>
-                            <td data-label="Questions"><span class="fw-semibold">{{ $test->questions_count }}</span></td>
-                            <td data-label="Results"><span class="fw-semibold">{{ $test->results_count }}</span></td>
+                            <td data-label="Questions"><span class="exam-list__metric">{{ $test->questions_count }}</span></td>
+                            <td data-label="Results"><span class="exam-list__metric">{{ $test->results_count }}</span></td>
                             <td data-label="Created by">{{ $test->creator->name ?? 'Former Faculty' }}</td>
                             <td data-label="Actions" class="text-end exam-list__actions">
+                                <a class="btn btn-sm btn-outline-secondary" href="{{ route($testRoutePrefix.'.tests.print', $test) }}" target="_blank" rel="noopener">
+                                    <i class="bi bi-printer me-1" aria-hidden="true"></i>Print
+                                </a>
+                                @if ($canManage)
+                                    <a class="btn btn-sm btn-outline-primary" href="{{ route($testRoutePrefix.'.tests.edit', $test) }}">
+                                        <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Edit
+                                    </a>
+                                @endif
                                 @if (auth()->user()->role === 'super-admin')
                                     @if ($test->approval_status === 'pending')
                                         <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#reviewExamModal{{ $test->id }}"><i class="bi bi-clipboard-check me-1" aria-hidden="true"></i>Review request</button>
@@ -326,8 +423,8 @@
                                 @elseif (auth()->user()->role === 'admin' && $test->is_published && $test->approval_status === 'approved')
                                     <a class="btn btn-sm btn-outline-primary" href="{{ route('admin.item-analysis.index', ['test_id' => $test->id]) }}"><i class="bi bi-graph-up-arrow me-1" aria-hidden="true"></i>Analyze</a>
                                 @endif
-                                @if (auth()->user()->role === 'super-admin' && $test->results_count === 0)
-                                    <form action="{{ route('super-admin.tests.destroy', $test) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this examination?');">
+                                @if ($canManage)
+                                    <form action="{{ route($testRoutePrefix.'.tests.destroy', $test) }}" method="POST" onsubmit="return confirm('Delete this examination?');">
                                         @csrf
                                         @method('DELETE')
                                         <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash3 me-1" aria-hidden="true"></i>Delete</button>
@@ -372,6 +469,9 @@
                             @foreach ($test->questions as $question)
                                 <section class="exam-review__question mb-3">
                                     <h3 class="h6 fw-bold"><span class="text-primary me-1">{{ str_pad((string) $loop->iteration, 2, '0', STR_PAD_LEFT) }}</span>{{ $question->question }}</h3>
+                                    @if ($question->image_path)
+                                        <img src="{{ asset('storage/'.$question->image_path) }}" alt="Question illustration" class="img-fluid rounded border mb-2" style="max-height: 12rem; object-fit: contain;">
+                                    @endif
                                         <ol type="A" class="mb-1">
                                             @foreach ($question->options ?? [] as $option)
                                                 <li class="{{ $option === $question->correct_answer ? 'text-success fw-semibold' : '' }}">
@@ -385,8 +485,25 @@
                                 @endforeach
                             </div>
                             <div class="modal-footer justify-content-between">
-                                <form action="{{ route('super-admin.tests.reject', $test) }}" method="POST">
+                                <form
+                                    action="{{ route('super-admin.tests.reject', $test) }}"
+                                    method="POST"
+                                    data-confirm-title="Reject this examination request?"
+                                    data-confirm-text="This will reject the request and notify the Faculty member. The comment is optional."
+                                    data-confirm-button="Reject request"
+                                >
                                     @csrf
+                                    <input type="hidden" name="test_id" value="{{ $test->id }}">
+                                    <label for="rejection-comment-{{ $test->id }}" class="form-label small fw-semibold">Comment for Faculty <span class="text-muted fw-normal">(optional)</span></label>
+                                    <textarea
+                                        class="form-control mb-2"
+                                        id="rejection-comment-{{ $test->id }}"
+                                        name="comment"
+                                        rows="2"
+                                        maxlength="1000"
+                                        aria-describedby="rejection-comment-help-{{ $test->id }}"
+                                    >{{ (string) old('test_id') === (string) $test->id ? old('comment') : '' }}</textarea>
+                                    <div class="form-text mb-2" id="rejection-comment-help-{{ $test->id }}">The comment will be included in the decision notification.</div>
                                     <button class="btn btn-outline-danger" type="submit">Reject request</button>
                                 </form>
                                 <div class="d-flex gap-2">

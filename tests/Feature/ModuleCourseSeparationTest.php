@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Jobs\ExtractSubtopicText;
+use App\Jobs\ProcessMathPdfJob;
 use App\Models\Course;
 use App\Models\Department;
 use App\Models\Module;
@@ -147,7 +147,7 @@ class ModuleCourseSeparationTest extends TestCase
 
     public function test_admin_can_upload_reviewer_files_up_to_75_mb_and_larger_files_are_rejected(): void
     {
-        Queue::fake([ExtractSubtopicText::class]);
+        Queue::fake([ProcessMathPdfJob::class]);
         Storage::fake('public');
         $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
         $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);

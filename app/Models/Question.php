@@ -13,12 +13,15 @@ class Question extends Model
     protected $fillable = [
         'test_id',
         'question_bank_item_id',
+        'topic_id',
         'question_type',
         'question',
         'options',
         'correct_answer',
         'explanation',
         'topic',
+        'image_path',
+        'difficulty',
     ];
 
     // This automatically converts the JSON string to an array for your Blade views
@@ -34,5 +37,10 @@ class Question extends Model
     public function questionBankItem(): BelongsTo
     {
         return $this->belongsTo(QuestionBankItem::class);
+    }
+
+    public function topicRecord(): BelongsTo
+    {
+        return $this->belongsTo(Topic::class, 'topic_id');
     }
 }

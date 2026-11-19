@@ -204,9 +204,12 @@ class StudentAchievementTest extends TestCase
         $this->assertDatabaseCount('student_notifications', 1);
 
         $this->actingAs($student)
-            ->get(route('student.notifications.index'))
+            ->get(route('student.notifications.index', [
+                'notification' => $student->receivedNotifications()->firstOrFail()->id,
+            ]))
             ->assertSee('Go to achievements')
             ->assertSee(route('student.achievements'), false)
-            ->assertSee('data-notification-sender="'.config('app.name').'"', false);
+            ->assertSee(config('app.name'))
+            ->assertSee('Achievement unlocked');
     }
 }

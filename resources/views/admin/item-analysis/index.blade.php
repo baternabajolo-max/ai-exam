@@ -320,8 +320,6 @@
         <p class="text-white-50 mb-0">Review correct and incorrect student responses for each examination question.</p>
     </header>
 
-    @if (session('success'))<div class="alert alert-success" role="status">{{ session('success') }}</div>@endif
-
     <section class="faculty-analysis__filter-bar d-flex flex-wrap justify-content-between align-items-center gap-3 p-3 p-md-4 mb-4" aria-label="Item analysis filter">
         <div>
             <div class="small text-uppercase text-muted fw-bold mb-1">Current analysis</div>
@@ -362,7 +360,7 @@
                             </select>
                         </div>
                         @if ($tests->isEmpty())
-                            <div class="alert alert-info mt-3 mb-0" role="status"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>No scheduled examinations are available for your assigned program.</div>
+                            <div class="alert alert-info mt-3 mb-0" role="status"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>No scheduled examinations are available for programs in your college.</div>
                         @endif
                     </div>
                     <div class="modal-footer">

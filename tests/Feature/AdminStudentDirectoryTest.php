@@ -34,6 +34,9 @@ class AdminStudentDirectoryTest extends TestCase
 
         $this->actingAs($admin)
             ->get(route('admin.students'))
+            ->assertSee('>Program</th>', false)
+            ->assertSee('Software Engineering')
+            ->assertDontSee('student-college', false)
             ->assertSee('data-confirm-title="Reject this registration request?"', false)
             ->assertSee('data-confirm-button="Reject request"', false)
             ->assertSee('data-confirm-title="Revoke student access?"', false)
@@ -366,6 +369,78 @@ class AdminStudentDirectoryTest extends TestCase
             ->assertDontSee('generalTestReviewModal')
             ->assertSee('Scheduled General Examination')
             ->assertViewHas('generalTestHistory', fn ($history): bool => $history->count() === 12);
+    }
+
+    public function test_exam_history_shows_attempt_review_and_same_department_staff_can_activate_one_retake(): void
+    {
+        $department = Department::create(['name' => 'Engineering', 'code' => 'ENG']);
+        $otherDepartment = Department::create(['name' => 'Business', 'code' => 'BUS']);
+        $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
+        $faculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $faculty->handledCourses()->attach($course);
+        $otherFaculty = User::factory()->create(['role' => 'admin', 'department_id' => $otherDepartment->id]);
+        $superAdmin = User::factory()->create(['role' => 'super-admin']);
+        $student = User::factory()->create([
+            'role' => 'student',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $exam = StudentTest::create([
+            'title' => 'Engineering Final Examination',
+            'topic' => 'Networks',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+            'is_scheduled_exam' => true,
+            'is_published' => true,
+            'approval_status' => StudentTest::APPROVAL_STATUS_APPROVED,
+            'available_from' => now()->subHour(),
+            'available_until' => now()->addHour(),
+        ]);
+        $result = Result::create([
+            'user_id' => $student->id,
+            'test_id' => $exam->id,
+            'score' => 3,
+            'total_questions' => 4,
+            'answers' => [],
+        ]);
+
+        $profileResponse = $this->actingAs($faculty)
+            ->get(route('admin.students.show', $student))
+            ->assertOk()
+            ->assertSee('Examination history')
+            ->assertSee('Engineering Final Examination')
+            ->assertSee('Activate retake')
+            ->assertSee('data-confirm-title="Activate one retake?"', false)
+            ->assertSee(route('admin.students.results.show', ['student' => $student, 'result' => $result]), false);
+        $profileDocument = new \DOMDocument;
+        $profileDocument->loadHTML($profileResponse->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+        $profileXpath = new \DOMXPath($profileDocument);
+        $this->assertSame(
+            1,
+            $profileXpath->query('//article[contains(@class, "test-row")]//div[contains(@class, "flex-column") and contains(@class, "align-items-center")]/a[contains(@aria-label, "attempt answers")]/following-sibling::form[.//button[contains(@aria-label, "Activate retake")]]')->length,
+        );
+
+        $this->post(route('admin.students.tests.retake', ['student' => $student, 'test' => $exam]))
+            ->assertRedirect()
+            ->assertSessionHas('success', 'One retake has been activated for '.$student->name.'.');
+
+        $this->assertDatabaseHas('test_retake_grants', [
+            'test_id' => $exam->id,
+            'student_id' => $student->id,
+            'granted_by' => $faculty->id,
+            'consumed_at' => null,
+        ]);
+
+        $this->actingAs($otherFaculty)
+            ->post(route('admin.students.tests.retake', ['student' => $student, 'test' => $exam]))
+            ->assertNotFound();
+
+        $this->actingAs($superAdmin)
+            ->post(route('super-admin.students.tests.retake', ['student' => $student, 'test' => $exam]))
+            ->assertRedirect()
+            ->assertSessionHas('success', 'A retake is already active for this examination.');
+
+        $this->assertDatabaseCount('test_retake_grants', 1);
     }
 
     public function test_dashboard_marks_recent_department_assessment_activity_active_and_inactive_students(): void

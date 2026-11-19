@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\ExtractSubtopicText;
+use App\Jobs\ProcessMathPdfJob;
 use App\Models\Achievement;
 use App\Models\Course;
 use App\Models\Module;
@@ -129,7 +129,7 @@ class ModuleController extends Controller
         ]);
 
         if ($this->isPdf($filePath)) {
-            ExtractSubtopicText::dispatch($subtopic->id, $filePath);
+            ProcessMathPdfJob::dispatch($subtopic->id, $filePath);
         }
 
         return redirect()->route('admin.modules.show', $module)->with('success', 'Subtopic added successfully.');
@@ -204,7 +204,7 @@ class ModuleController extends Controller
             }
 
             if ($this->isPdf($newFilePath)) {
-                ExtractSubtopicText::dispatch($subtopic->id, $newFilePath);
+                ProcessMathPdfJob::dispatch($subtopic->id, $newFilePath);
             }
         }
 

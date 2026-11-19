@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Course extends Model
@@ -31,6 +32,13 @@ class Course extends Model
         return $this->hasMany(User::class);
     }
 
+    public function facultyMembers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class)
+            ->where('users.role', 'admin')
+            ->orderBy('users.name');
+    }
+
     public function modules(): HasMany
     {
         return $this->hasMany(Module::class);
@@ -39,5 +47,10 @@ class Course extends Model
     public function tests(): HasMany
     {
         return $this->hasMany(Test::class);
+    }
+
+    public function topics(): HasMany
+    {
+        return $this->hasMany(Topic::class);
     }
 }

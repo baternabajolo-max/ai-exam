@@ -51,7 +51,8 @@
     }
 
     .exam-builder__program-card,
-    .exam-builder__question-card {
+    .exam-builder__question-card,
+    .exam-builder__bank-summary {
         border: 1px solid #e2e8f0;
         border-radius: 1.15rem;
         box-shadow: 0 .75rem 1.75rem rgb(15 23 42 / 7%), inset 0 1px #fff;
@@ -77,6 +78,10 @@
         overflow-wrap: anywhere;
     }
 
+    .exam-builder__question-copy {
+        min-width: 0;
+    }
+
     .exam-builder__question-card:hover {
         border-color: #a5b4fc;
         box-shadow: 0 1rem 1.75rem rgb(79 70 229 / 12%), inset 0 1px #fff;
@@ -86,6 +91,23 @@
     .exam-builder__question-card:has(.js-exam-question:checked) {
         background: linear-gradient(145deg, #eef2ff, #fff);
         border-color: #818cf8;
+    }
+
+    .exam-builder__bank-summary {
+        background: linear-gradient(145deg, #fff, #f8faff);
+    }
+
+    .exam-builder__bank-summary-icon {
+        align-items: center;
+        background: #eef2ff;
+        border: 1px solid #c7d2fe;
+        border-radius: .9rem;
+        color: #4338ca;
+        display: inline-flex;
+        flex: 0 0 auto;
+        height: 2.75rem;
+        justify-content: center;
+        width: 2.75rem;
     }
 
     .exam-builder__create-button {
@@ -133,6 +155,7 @@
         overflow-y: auto;
         overscroll-behavior: contain;
         padding-block: 1.25rem;
+        scroll-padding-block: 1rem;
         scrollbar-gutter: stable;
     }
 
@@ -185,6 +208,66 @@
         text-align: center;
     }
 
+    .exam-builder__step-nav {
+        display: grid;
+        gap: .6rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .exam-builder__step-link {
+        align-items: center;
+        background: var(--bs-body-bg);
+        border: 1px solid #e2e8f0;
+        border-radius: .8rem;
+        color: var(--bs-body-color);
+        display: flex;
+        gap: .65rem;
+        min-height: 2.85rem;
+        padding: .55rem .75rem;
+        text-decoration: none;
+        transition: border-color .18s ease, background-color .18s ease;
+    }
+
+    .exam-builder__step-link:hover,
+    .exam-builder__step-link:focus-visible {
+        background: #eef2ff;
+        border-color: #a5b4fc;
+        color: #312e81;
+    }
+
+    .exam-builder__step-number {
+        align-items: center;
+        background: #e0e7ff;
+        border-radius: 50%;
+        color: #3730a3;
+        display: inline-flex;
+        flex: 0 0 auto;
+        font-size: .75rem;
+        font-weight: 800;
+        height: 1.7rem;
+        justify-content: center;
+        width: 1.7rem;
+    }
+
+    .exam-builder__question-picker {
+        border: 1px solid #e2e8f0;
+        border-radius: .9rem;
+        max-height: 17rem;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: .65rem;
+        scrollbar-gutter: stable;
+    }
+
+    .exam-builder__question-picker .exam-builder__question-card {
+        box-shadow: none;
+        padding: .85rem !important;
+    }
+
+    .exam-builder__question-picker .exam-builder__question-card:hover {
+        transform: none;
+    }
+
     .exam-builder__modal .form-switch {
         min-height: 4.1rem;
     }
@@ -228,7 +311,8 @@
     }
 
     html[data-bs-theme="dark"] .exam-builder__program-card,
-    html[data-bs-theme="dark"] .exam-builder__question-card {
+    html[data-bs-theme="dark"] .exam-builder__question-card,
+    html[data-bs-theme="dark"] .exam-builder__bank-summary {
         background: linear-gradient(145deg, #1e293b, #172033);
         border-color: #334155;
         box-shadow: 0 .75rem 1.75rem rgb(0 0 0 / 18%), inset 0 1px rgb(255 255 255 / 4%);
@@ -246,6 +330,38 @@
     html[data-bs-theme="dark"] .exam-builder__details-heading i {
         background: #262f57;
         color: #c7d2fe;
+    }
+
+    html[data-bs-theme="dark"] .exam-builder__bank-summary-icon {
+        background: #262f57;
+        border-color: #4855a3;
+        color: #c7d2fe;
+    }
+
+    html[data-bs-theme="dark"] .exam-builder__step-link {
+        border-color: #334155;
+    }
+
+    html[data-bs-theme="dark"] .exam-builder__step-link:hover,
+    html[data-bs-theme="dark"] .exam-builder__step-link:focus-visible {
+        background: #262f57;
+        border-color: #6366f1;
+        color: #e0e7ff;
+    }
+
+    html[data-bs-theme="dark"] .exam-builder__step-number {
+        background: #3730a3;
+        color: #e0e7ff;
+    }
+
+    html[data-bs-theme="dark"] .exam-builder__question-picker {
+        border-color: #334155;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .exam-builder__step-link {
+            transition: none;
+        }
     }
 </style>
 
@@ -267,35 +383,72 @@
         </a>
     </header>
 
-    @if (session('success'))
-        <div class="alert alert-success" role="status">{{ session('success') }}</div>
-    @endif
-    @if ($errors->any())
-        <div class="alert alert-danger" role="alert">
-            <p class="fw-semibold mb-1">Please review the examination details and try again.</p>
-            <ul class="mb-0">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
-        </div>
-    @endif
-
     <section class="exam-builder__program-card mb-4" aria-labelledby="exam-setup-heading">
         <div class="card-body d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-4 p-4">
             <div>
                 <span class="badge rounded-pill {{ $isFacultyRequest ? 'text-bg-warning' : 'text-bg-primary' }} mb-2">
                     {{ $isFacultyRequest ? 'Requires Admin approval' : 'Admin-only timed assessment' }}
                 </span>
-                <h2 class="h4 fw-bold mb-1" id="exam-setup-heading">Start with a program</h2>
+                <h2 class="h4 fw-bold mb-1" id="exam-setup-heading">{{ $isFacultyRequest ? 'Choose a program' : 'Start with a college' }}</h2>
                 <p class="text-muted mb-0">
-                    {{ $isFacultyRequest ? 'Questions will appear as soon as you choose a program. Your exam stays private until approved.' : 'Choose a program to see its questions from all Faculty banks.' }}
+                    {{ $isFacultyRequest ? 'Select a program in your college to prepare your exam for Admin approval.' : 'Choose a college, then select one of its programs to include Faculty questions in the exam builder.' }}
                 </p>
             </div>
-            <form id="exam-course-form" method="GET" action="{{ route($isFacultyRequest ? 'admin.tests.create' : 'super-admin.tests.create') }}" class="d-flex flex-column flex-sm-row gap-2">
-                <label class="visually-hidden" for="exam-course">Academic program</label>
-                <select id="exam-course" name="course_id" class="form-select form-select-lg" required>
-                    <option value="">Choose a program</option>
-                    @foreach($courses as $course)
-                        <option value="{{ $course->id }}" @selected((string) $selectedCourseId === (string) $course->id)>{{ $course->department->name }} — {{ $course->name }}</option>
-                    @endforeach
-                </select>
+            <div class="d-flex flex-column flex-lg-row align-items-stretch align-items-lg-end gap-2">
+                @if ($isFacultyRequest)
+                    <form id="exam-course-form" method="GET" action="{{ route('admin.tests.create') }}">
+                        <label class="form-label fw-semibold small mb-1" for="exam-course">Program</label>
+                        <select id="exam-course" name="course_id" class="form-select form-select-lg" required @disabled($courses->isEmpty())>
+                            @if ($courses->isEmpty())
+                                <option value="">No programs available</option>
+                            @else
+                                <option value="">Choose a program</option>
+                                @foreach($courses as $course)
+                                    <option value="{{ $course->id }}" @selected((string) $selectedCourseId === (string) $course->id)>{{ $course->name }}</option>
+                                @endforeach
+                            @endif
+                        </select>
+                        @if ($courses->isNotEmpty())
+                            <noscript><button class="btn btn-outline-primary mt-2" type="submit">Load program questions</button></noscript>
+                        @endif
+                    </form>
+                @else
+                    <form id="exam-department-form" method="GET" action="{{ route('super-admin.tests.create') }}">
+                        <label class="form-label fw-semibold small mb-1" for="exam-department">College</label>
+                        <select id="exam-department" name="department_id" class="form-select form-select-lg" required>
+                            <option value="">Choose a college</option>
+                            @foreach($departments as $department)
+                                <option value="{{ $department->id }}" @selected((string) $selectedDepartmentId === (string) $department->id)>{{ $department->name }}</option>
+                            @endforeach
+                        </select>
+                        <noscript><button class="btn btn-outline-primary mt-2" type="submit">Load programs</button></noscript>
+                    </form>
+                    <form id="exam-course-form" method="GET" action="{{ route('super-admin.tests.create') }}">
+                        <input type="hidden" name="department_id" value="{{ $selectedDepartmentId }}">
+                        <label class="form-label fw-semibold small mb-1" for="exam-course">Program</label>
+                        <select
+                            id="exam-course"
+                            name="course_id"
+                            class="form-select form-select-lg"
+                            required
+                            @disabled($selectedDepartmentId === null || $courses->isEmpty())
+                        >
+                            @if ($selectedDepartmentId === null)
+                                <option value="">Choose a college first</option>
+                            @elseif ($courses->isEmpty())
+                                <option value="">No programs available</option>
+                            @else
+                                <option value="">Choose a program</option>
+                                @foreach($courses as $course)
+                                    <option value="{{ $course->id }}" @selected((string) $selectedCourseId === (string) $course->id)>{{ $course->name }}</option>
+                                @endforeach
+                            @endif
+                        </select>
+                        @if ($selectedDepartmentId !== null && $courses->isNotEmpty())
+                            <noscript><button class="btn btn-outline-primary mt-2" type="submit">Load program questions</button></noscript>
+                        @endif
+                    </form>
+                @endif
                 @if ($selectedCourseId)
                     <button
                         class="btn btn-primary btn-lg rounded-3 exam-builder__create-button text-nowrap"
@@ -307,49 +460,32 @@
                         <i class="bi bi-plus-circle me-1" aria-hidden="true"></i> Create examination
                     </button>
                 @endif
-            </form>
+            </div>
         </div>
     </section>
 
-    @if (!$selectedCourseId)
-        <div class="alert alert-info rounded-4 shadow-sm" role="status">Choose a program to see its questions from every Faculty bank.</div>
+    @if ($isFacultyRequest && $courses->isEmpty())
+        <div class="alert alert-info rounded-4 shadow-sm" role="status">No programs are available for your college. Ask an Admin to assign your faculty account to a college.</div>
+    @elseif ($isFacultyRequest && !$selectedCourseId)
+        <div class="alert alert-info rounded-4 shadow-sm" role="status">Choose a program in your college to start building an exam.</div>
+    @elseif (!$isFacultyRequest && $selectedDepartmentId === null)
+        <div class="alert alert-info rounded-4 shadow-sm" role="status">Choose a college to view its available programs.</div>
+    @elseif (!$isFacultyRequest && !$selectedCourseId && $courses->isEmpty())
+        <div class="alert alert-info rounded-4 shadow-sm" role="status">There are no programs available in this college yet.</div>
+    @elseif (!$isFacultyRequest && !$selectedCourseId)
+        <div class="alert alert-info rounded-4 shadow-sm" role="status">Choose a program to start building an exam from its Faculty question bank.</div>
     @elseif ($questionBankItems->isEmpty())
         <div class="alert alert-info rounded-4 shadow-sm" role="status">
-            No Faculty has added questions to this program yet. Ask Faculty to add questions to their individual banks.
+            No enabled questions are currently available in this program. Faculty can enable questions in the Question Bank.
         </div>
     @else
-        <section class="mb-4" aria-labelledby="program-question-bank-heading">
-            <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
-                <div>
-                    <span class="exam-builder__eyebrow text-primary">Question collection</span>
-                    <h2 class="h3 fw-bold mb-1" id="program-question-bank-heading">Questions for {{ $courses->firstWhere('id', $selectedCourseId)?->name }}</h2>
-                    <p class="text-muted mb-0">All {{ $questionBankItems->count() }} questions in this program are available, including questions from your own bank and other Faculty banks.</p>
-                    <p class="small text-muted mb-0 mt-1">Pick questions yourself, or choose random questions in the exam setup.</p>
-                </div>
-                <span class="badge rounded-pill text-bg-light border px-3 py-2">{{ $questionBankItems->count() }} available</span>
+        <section class="exam-builder__bank-summary d-flex flex-wrap align-items-center gap-3 p-3 p-md-4 mb-4" aria-labelledby="program-question-bank-heading">
+            <span class="exam-builder__bank-summary-icon" aria-hidden="true"><i class="bi bi-collection"></i></span>
+            <div class="flex-grow-1">
+                <h2 class="h5 fw-bold mb-1" id="program-question-bank-heading">Question bank ready</h2>
+                <p class="text-muted mb-0">All {{ $questionBankItems->count() }} questions in this program are available to choose in the exam setup for {{ $courses->firstWhere('id', $selectedCourseId)?->name }}.</p>
             </div>
-            <div class="row g-3">
-                @foreach ($questionBankItems as $item)
-                    <div class="col-12 col-xl-6">
-                        <label class="exam-builder__question-card d-flex gap-3 align-items-start p-3 h-100">
-                            <input
-                                class="form-check-input mt-1 js-exam-question"
-                                type="checkbox"
-                                value="{{ $item->id }}"
-                                @checked(in_array($item->id, (array) old('question_bank_item_ids', [])))
-                            >
-                            <span class="flex-grow-1">
-                                <span class="badge rounded-pill text-bg-light mb-2">{{ $item->topic ?: 'General' }}</span>
-                                <span class="exam-builder__question-text d-block fw-semibold">{{ $item->question }}</span>
-                                <span class="small text-muted mt-2 d-block">{{ count($item->options ?? []) }} answer choices · {{ $item->author->name ?? 'Former Faculty' }}'s bank</span>
-                            </span>
-                        </label>
-                    </div>
-                @endforeach
-            </div>
-            <div class="d-flex justify-content-end mt-3">
-                <span class="badge rounded-pill text-bg-primary px-3 py-2" id="selected-question-count" role="status" aria-live="polite">0 selected</span>
-            </div>
+            <span class="badge rounded-pill text-bg-light border px-3 py-2">{{ $questionBankItems->count() }} available</span>
         </section>
 
         <div class="modal fade" id="createExamModal" tabindex="-1" aria-labelledby="create-exam-heading" aria-hidden="true">
@@ -358,7 +494,6 @@
                     <form id="createExamForm" action="{{ route($isFacultyRequest ? 'admin.tests.store-manual' : 'super-admin.tests.store-manual') }}" method="POST">
                         @csrf
                         <input type="hidden" name="course_id" value="{{ $selectedCourseId }}">
-                        <div id="examQuestionIds"></div>
                         <div class="modal-header border-0 px-4 pt-4">
                             <div>
                                 <span class="exam-builder__eyebrow text-primary">Examination setup</span>
@@ -368,13 +503,23 @@
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body px-4">
+                            <nav class="exam-builder__step-nav mb-4" aria-label="Exam setup sections">
+                                <a class="exam-builder__step-link" href="#exam-selection-heading">
+                                    <span class="exam-builder__step-number">1</span>
+                                    <span class="small fw-semibold">Choose questions</span>
+                                </a>
+                                <a class="exam-builder__step-link" href="#exam-details-heading">
+                                    <span class="exam-builder__step-number">2</span>
+                                    <span class="small fw-semibold">Details &amp; schedule</span>
+                                </a>
+                            </nav>
                             <section class="rounded-4 bg-body-tertiary p-3 p-md-4 mb-4" aria-labelledby="exam-selection-heading">
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                                     <div>
                                         <h3 class="h6 fw-bold mb-1" id="exam-selection-heading">Choose your questions</h3>
-                                        <p class="small text-muted mb-0">Set the item count, then select questions below or randomize them.</p>
+                                        <p class="small text-muted mb-0">Set the number of items, then choose from this program's bank or randomize.</p>
                                     </div>
-                                    <span class="badge rounded-pill text-bg-primary px-3 py-2 exam-builder__selection-count" id="modal-selected-question-count">0 selected</span>
+                                    <span class="badge rounded-pill text-bg-primary px-3 py-2 exam-builder__selection-count" id="modal-selected-question-count" role="status" aria-live="polite">0 selected</span>
                                 </div>
                                 <div class="row g-3 align-items-center">
                                     <div class="col-sm-5 col-md-4">
@@ -394,11 +539,37 @@
                                         <div class="form-check form-switch border rounded-3 p-3 ps-5 bg-body">
                                             <input class="form-check-input" type="checkbox" role="switch" id="random-question-selection">
                                             <label class="form-check-label fw-semibold" for="random-question-selection">Choose random questions automatically</label>
-                                            <div class="small text-muted">Randomly selects exactly the item count above.</div>
+                                            <div class="small text-muted">Selects exactly the item count above from all available questions.</div>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="small text-danger mt-2" id="question-selection-error" role="alert" hidden>Close this dialog, select exactly the requested number of question cards, then reopen the exam setup.</div>
+                                <div class="small text-danger mt-2" id="question-selection-error" role="alert" hidden>Select exactly the requested number of questions below, or use random selection.</div>
+                                <div class="exam-builder__question-picker mt-3">
+                                    <div class="row g-2">
+                                        @foreach ($questionBankItems as $item)
+                                            <div class="col-12 col-md-6">
+                                                <label class="exam-builder__question-card d-flex gap-3 align-items-start h-100">
+                                                    <input
+                                                        class="form-check-input mt-1 js-exam-question"
+                                                        type="checkbox"
+                                                        name="question_bank_item_ids[]"
+                                                        value="{{ $item->id }}"
+                                                        @checked(in_array($item->id, (array) old('question_bank_item_ids', [])))
+                                                    >
+                                                    <span class="exam-builder__question-copy flex-grow-1">
+                                                        <span class="badge rounded-pill text-bg-light mb-2">{{ $item->topic ?: 'General' }}</span>
+                                                        <span class="badge rounded-pill {{ $item->difficulty === 'hard' ? 'text-bg-danger' : ($item->difficulty === 'easy' ? 'text-bg-success' : 'text-bg-warning') }} mb-2">{{ ucfirst($item->difficulty ?? 'moderate') }}</span>
+                                                        <span class="exam-builder__question-text d-block fw-semibold">{{ $item->question }}</span>
+                                                        @if ($item->image_path)
+                                                            <img src="{{ asset('storage/'.$item->image_path) }}" alt="Question illustration" class="img-fluid rounded border mt-2" style="max-height: 7rem; object-fit: contain;">
+                                                        @endif
+                                                        <span class="small text-muted mt-2 d-block">{{ count($item->options ?? []) }} answer choices · {{ $item->author->name ?? 'Former Faculty' }}'s bank</span>
+                                                    </span>
+                                                </label>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
                             </section>
                             <section aria-labelledby="exam-details-heading">
                                 <h3 class="h6 fw-bold mb-3 exam-builder__details-heading" id="exam-details-heading"><i class="bi bi-calendar2-week" aria-hidden="true"></i>Exam details and schedule</h3>
@@ -441,11 +612,15 @@
                                 </div>
                             </section>
                         </div>
-                        <div class="modal-footer border-0 px-4 pb-4">
-                            <button class="btn btn-light rounded-pill px-4" type="button" data-bs-dismiss="modal">Keep editing</button>
+                        <div class="modal-footer border-0 px-4 pb-4 justify-content-between">
+                            <p class="small text-muted mb-0 me-auto">
+                                <i class="bi {{ $isFacultyRequest ? 'bi-shield-check' : 'bi-calendar-check' }} me-1" aria-hidden="true"></i>
+                                {{ $isFacultyRequest ? 'Students can access it after Admin approval.' : 'Students can access it during the scheduled window.' }}
+                            </p>
+                            <button class="btn btn-light rounded-pill px-4" type="button" data-bs-dismiss="modal">Continue editing</button>
                             <button class="btn btn-primary rounded-pill px-4 exam-builder__create-button" type="submit">
                                 <i class="bi {{ $isFacultyRequest ? 'bi-send' : 'bi-check2-circle' }} me-1" aria-hidden="true"></i>
-                                {{ $isFacultyRequest ? 'Post exam' : 'Publish timed examination' }}
+                                {{ $isFacultyRequest ? 'Submit for approval' : 'Publish timed examination' }}
                             </button>
                         </div>
                     </form>
@@ -464,8 +639,13 @@
 @endif
 <script>
     document.addEventListener('DOMContentLoaded', () => {
+        const departmentForm = document.getElementById('exam-department-form');
+        const departmentSelect = document.getElementById('exam-department');
         const courseForm = document.getElementById('exam-course-form');
         const courseSelect = document.getElementById('exam-course');
+        if (departmentForm && departmentSelect) {
+            departmentSelect.addEventListener('change', () => departmentForm.requestSubmit());
+        }
         if (courseForm && courseSelect) {
             courseSelect.addEventListener('change', () => courseForm.requestSubmit());
         }
@@ -487,17 +667,15 @@
         startsAtInput.addEventListener('change', updateClosingDateMinimum);
         updateClosingDateMinimum();
 
-        const selectedCount = document.getElementById('selected-question-count');
         const modalSelectedCount = document.getElementById('modal-selected-question-count');
         const selectionError = document.getElementById('question-selection-error');
-        const questionCheckboxes = Array.from(document.querySelectorAll('.js-exam-question'));
+        const questionCheckboxes = Array.from(form.querySelectorAll('.js-exam-question'));
         const questionCountInput = document.getElementById('question-count');
         const randomSelection = document.getElementById('random-question-selection');
         const updateSelectedQuestionCount = () => {
             const count = questionCheckboxes.filter((checkbox) => checkbox.checked).length;
             const requestedCount = Number.parseInt(questionCountInput.value, 10) || 0;
             const label = `${count} of ${requestedCount} selected`;
-            selectedCount.textContent = label;
             modalSelectedCount.textContent = label;
             selectionError.hidden = true;
         };
@@ -546,7 +724,7 @@
             if (count !== requestedCount) {
                 event.preventDefault();
                 selectionError.hidden = false;
-                questionCountInput.focus();
+                (questionCheckboxes.find((checkbox) => !checkbox.checked) ?? questionCountInput).focus();
                 return;
             }
 
@@ -557,17 +735,6 @@
                 return;
             }
 
-            const selectedQuestionIds = document.getElementById('examQuestionIds');
-            selectedQuestionIds.replaceChildren(...questionCheckboxes
-                .filter((checkbox) => checkbox.checked)
-                .map((checkbox) => {
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = 'question_bank_item_ids[]';
-                    input.value = checkbox.value;
-
-                    return input;
-                }));
         });
         closesAtInput.addEventListener('input', () => closesAtInput.setCustomValidity(''));
         updateSelectedQuestionCount();

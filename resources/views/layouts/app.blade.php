@@ -79,6 +79,104 @@
             white-space: nowrap;
         }
 
+        @media (min-width: 992px) {
+            .role-sidebar-navbar {
+                height: 3.75rem;
+                min-height: 3.75rem;
+                z-index: 1030;
+            }
+
+            .role-sidebar-navbar .container-fluid {
+                min-height: 0;
+            }
+
+            .role-sidebar-navbar .navbar-toggler {
+                display: none;
+            }
+
+            .role-sidebar-navbar .navbar-collapse {
+                align-items: center;
+                display: flex !important;
+                flex-basis: auto;
+                flex-wrap: nowrap;
+            }
+
+            .role-sidebar-navbar .navbar-nav.me-auto {
+                align-items: stretch;
+                background: var(--bs-body-bg, #fff);
+                border-right: 1px solid rgba(148, 163, 184, .24);
+                bottom: 0;
+                box-shadow: 8px 0 24px rgba(15, 23, 42, .04);
+                flex-direction: column;
+                gap: .3rem !important;
+                left: 0;
+                margin: 0 !important;
+                overflow-x: hidden;
+                overflow-y: auto;
+                padding: 1rem .75rem;
+                position: fixed;
+                top: 3.75rem;
+                width: 16.5rem;
+                z-index: 1020;
+            }
+
+            .role-sidebar-navbar .navbar-nav.me-auto .nav-link {
+                border-radius: .75rem;
+                padding: .65rem .8rem;
+                text-align: left;
+                white-space: normal;
+            }
+
+            .role-sidebar-navbar .navbar-nav.me-auto .nav-link.active {
+                background: color-mix(in srgb, var(--bs-primary) 12%, white);
+                color: var(--bs-primary);
+            }
+
+            .role-sidebar-navbar .admin-nav-search {
+                flex: 0 1 22rem;
+                max-width: min(28rem, 38vw);
+                min-width: 16rem;
+                margin-left: auto;
+                width: 22rem;
+            }
+
+            .role-sidebar-navbar .navbar-nav.ms-auto {
+                flex-direction: row;
+                flex-shrink: 0;
+                margin-left: .75rem !important;
+            }
+
+            .role-sidebar-navbar .sidebar-account-links {
+                border-top: 1px solid rgba(148, 163, 184, .24);
+                margin-top: auto;
+                padding-top: .75rem;
+                width: 100%;
+            }
+
+            .role-sidebar-navbar .sidebar-account-links .nav-link {
+                width: 100%;
+            }
+
+            #app:has(> .role-sidebar-navbar) > main.app-main {
+                margin-left: 16.5rem;
+                width: calc(100% - 16.5rem);
+            }
+
+            html[data-bs-theme="dark"] .role-sidebar-navbar .navbar-nav.me-auto {
+                background: #1e293b;
+                border-color: #334155;
+            }
+
+            html[data-bs-theme="dark"] .role-sidebar-navbar .navbar-nav.me-auto .nav-link.active {
+                background: color-mix(in srgb, var(--bs-primary) 22%, #1e293b);
+                color: #93c5fd;
+            }
+
+            html[data-bs-theme="dark"] .role-sidebar-navbar .sidebar-account-links {
+                border-color: #334155;
+            }
+        }
+
         .admin-nav-search-results {
             left: 0;
             max-height: 20rem;
@@ -91,6 +189,130 @@
 
         .admin-nav-search-results[hidden] {
             display: none;
+        }
+
+        .notification-dropdown {
+            min-width: min(340px, 94vw);
+            max-width: min(94vw, 430px);
+            overflow: hidden;
+            transform-origin: top right;
+        }
+
+        .notification-dropdown.show {
+            animation: notification-dropdown-in .2s ease-out both;
+        }
+
+        .notification-dropdown__list {
+            max-height: 23rem;
+            min-width: 0;
+            overflow-x: hidden;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            width: 100%;
+        }
+
+        .notification-dropdown__item {
+            border-bottom: 1px solid rgba(148, 163, 184, .16);
+            min-width: 0;
+            overflow: hidden;
+            padding: .25rem .65rem;
+            width: 100%;
+        }
+
+        .notification-dropdown__trigger {
+            align-items: center;
+            background: transparent;
+            border: 0;
+            border-radius: .85rem;
+            color: inherit;
+            display: flex;
+            gap: .75rem;
+            min-width: 0;
+            overflow: hidden;
+            padding: .7rem;
+            text-align: left;
+            transition: background .18s ease, transform .18s ease, box-shadow .18s ease;
+            width: 100%;
+        }
+
+        .notification-dropdown__trigger > .flex-grow-1 {
+            flex: 1 1 0%;
+            min-width: 0;
+        }
+
+        .notification-dropdown__trigger .text-truncate {
+            max-width: 100%;
+        }
+
+        .notification-dropdown__trigger:hover,
+        .notification-dropdown__trigger:focus-visible {
+            background: rgba(59, 130, 246, .08);
+            box-shadow: 0 6px 14px rgba(15, 23, 42, .07);
+            outline: none;
+            transform: translateX(2px);
+        }
+
+        .notification-dropdown__item.is-unread .notification-dropdown__trigger {
+            background: rgba(59, 130, 246, .045);
+        }
+
+        .notification-dropdown__avatar,
+        .notification-modal__icon {
+            align-items: center;
+            background: color-mix(in srgb, var(--bs-primary) 12%, white);
+            border: 1px solid color-mix(in srgb, var(--bs-primary) 20%, white);
+            border-radius: 50%;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 5px 12px rgba(15, 23, 42, .08);
+            color: var(--bs-primary);
+            display: inline-flex;
+            flex: 0 0 auto;
+            height: 2.65rem;
+            justify-content: center;
+            width: 2.65rem;
+        }
+
+        .notification-dropdown__dot {
+            background: #2563eb;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+            flex: 0 0 auto;
+            height: .6rem;
+            width: .6rem;
+        }
+
+        .notification-dropdown__view-all {
+            background: linear-gradient(180deg, #fff, #f8fafc);
+            border-top: 1px solid rgba(148, 163, 184, .2);
+            color: var(--bs-primary);
+            display: block;
+            font-size: .875rem;
+            font-weight: 700;
+            padding: .85rem 1rem;
+            text-align: center;
+            text-decoration: none;
+            transition: background .18s ease, letter-spacing .18s ease;
+        }
+
+        .notification-dropdown__view-all:hover {
+            background: rgba(59, 130, 246, .07);
+            letter-spacing: .01em;
+        }
+
+        .notification-modal-content {
+            animation: notification-modal-in .3s cubic-bezier(.2, .8, .2, 1) both;
+            border-radius: 1.15rem;
+            box-shadow: 0 24px 70px rgba(15, 23, 42, .24), 0 6px 18px rgba(15, 23, 42, .12);
+        }
+
+        @keyframes notification-dropdown-in {
+            from { opacity: 0; transform: translateY(-6px) scale(.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @keyframes notification-modal-in {
+            from { opacity: 0; transform: translateY(12px) scale(.985); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
         @media (max-width: 1399.98px) {
@@ -145,6 +367,15 @@
         html[data-bs-theme="dark"] .list-group-item.bg-light { background-color: #334155 !important; }
         html[data-bs-theme="dark"] .dropdown-item { color: #e2e8f0; }
         html[data-bs-theme="dark"] .dropdown-item:hover { background-color: #334155; }
+        html[data-bs-theme="dark"] .notification-dropdown__view-all {
+            background: linear-gradient(180deg, #1e293b, #172033);
+            border-color: #334155;
+        }
+        html[data-bs-theme="dark"] .notification-dropdown__trigger:hover,
+        html[data-bs-theme="dark"] .notification-dropdown__trigger:focus-visible,
+        html[data-bs-theme="dark"] .notification-dropdown__item.is-unread .notification-dropdown__trigger {
+            background: rgba(96, 165, 250, .12);
+        }
 
         /* Keep page content consistently spaced below the sticky navigation.
            Individual page containers should not add another top offset. */
@@ -177,7 +408,7 @@
 <body @auth @if(auth()->user()->role === 'student') class="student-theme" @elseif(auth()->user()->role === 'super-admin') class="super-admin-theme" @endif @endauth>
     <div id="app">
         @unless(View::hasSection('hide-navbar') || View::hasSection('hide-nav'))
-            <nav class="navbar navbar-expand-xxl navbar-light bg-white shadow-sm sticky-top">
+            <nav class="navbar navbar-expand-xxl navbar-light bg-white shadow-sm sticky-top {{ in_array(auth()->user()->role ?? '', ['admin', 'super-admin'], true) ? 'role-sidebar-navbar' : '' }}">
                 <div class="container-fluid px-3 px-xxl-4">
                     <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="{{ url('/dashboard') }}">
                         <img src="{{ asset('storage/images/systemlogo.jpg') }}" alt="" width="36" height="36" class="rounded-circle bg-white object-fit-contain p-1">
@@ -228,7 +459,10 @@
                                         <a href="{{ route('admin.tests.index') }}" class="nav-link {{ request()->routeIs('admin.tests*') ? 'active fw-semibold' : '' }}">Examinations</a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="{{ route('admin.leaderboard') }}" class="nav-link {{ request()->routeIs('admin.leaderboard*') ? 'active fw-semibold' : '' }}">Leaderboard</a>
+                                        <a href="{{ route('admin.item-analysis.index') }}" class="nav-link {{ request()->routeIs('admin.item-analysis*') ? 'active fw-semibold' : '' }}">Analysis</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="{{ route('faculty.results.index') }}" class="nav-link {{ request()->routeIs('faculty.results*') ? 'active fw-semibold' : '' }}">Results</a>
                                     </li>
                                 @elseif(auth()->user()->role === 'super-admin')
                                     <li class="nav-item">
@@ -244,13 +478,42 @@
                                         <a class="nav-link {{ request()->routeIs('super-admin.monitoring*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.monitoring') }}">Monitoring</a>
                                     </li>
                                     <li class="nav-item">
-                                        <a class="nav-link {{ request()->routeIs('super-admin.tests*', 'super-admin.item-analysis*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.tests.index') }}">Examinations &amp; Analysis</a>
+                                        <a class="nav-link {{ request()->routeIs('super-admin.tests*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.tests.index') }}">Examinations</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link {{ request()->routeIs('super-admin.item-analysis*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.item-analysis.index') }}">Analysis</a>
                                     </li>
                                     <li class="nav-item">
                                         <a class="nav-link {{ request()->routeIs('super-admin.question-bank*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.question-bank.index') }}">Question Bank</a>
                                     </li>
                                     <li class="nav-item">
-                                        <a class="nav-link {{ request()->routeIs('super-admin.leaderboard*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.leaderboard') }}">Leaderboard</a>
+                                        <a class="nav-link {{ request()->routeIs('super-admin.results*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.results.index') }}">Results</a>
+                                    </li>
+                                @endif
+                                @if(in_array(Auth::user()->role, ['admin', 'super-admin'], true))
+                                    <li class="nav-item sidebar-account-links">
+                                        @if(Auth::user()->role === 'admin')
+                                            <a class="nav-link d-flex align-items-center gap-2 {{ request()->routeIs('admin.profile') ? 'active fw-semibold' : '' }}" href="{{ route('admin.profile') }}">
+                                                <i class="bi bi-person" aria-hidden="true"></i>Profile
+                                            </a>
+                                        @else
+                                            <a class="nav-link d-flex align-items-center gap-2 {{ request()->routeIs('super-admin.profile') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.profile') }}">
+                                                <i class="bi bi-person" aria-hidden="true"></i>Profile
+                                            </a>
+                                        @endif
+                                        <a class="nav-link d-flex align-items-center gap-2" href="#" data-bs-toggle="modal" data-bs-target="#themeSettingsModal">
+                                            <i class="bi bi-sliders" aria-hidden="true"></i>Settings
+                                        </a>
+                                        <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
+                                            @csrf
+                                        </form>
+                                        <a
+                                            class="nav-link d-flex align-items-center gap-2 text-danger"
+                                            href="{{ route('logout') }}"
+                                            onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
+                                        >
+                                            <i class="bi bi-box-arrow-right" aria-hidden="true"></i>Logout
+                                        </a>
                                     </li>
                                 @endif
                             @endauth
@@ -269,6 +532,7 @@
                                 <form action="{{ route($studentSearchDashboardRoute) }}" method="GET" class="admin-nav-search d-flex" role="search" data-suggestions-url="{{ route($studentSuggestionsRoute) }}">
                                     @if(Auth::user()->role === 'super-admin')
                                         <input type="hidden" name="college_id" value="{{ request('college_id') }}">
+                                        <input type="hidden" name="course_id" value="{{ request('course_id') }}">
                                         @if(request()->routeIs('super-admin.dashboard'))
                                             <input type="hidden" name="period" value="{{ request('period', '30') }}">
                                             @if(request('period') === 'custom')
@@ -277,7 +541,7 @@
                                             @endif
                                         @endif
                                     @endif
-                                    <label class="visually-hidden" for="admin-nav-student-search">Search students by name, email, or student ID</label>
+                                    <label class="visually-hidden" for="admin-nav-student-search">{{ request()->routeIs('faculty.results*', 'super-admin.results*') ? 'Search students' : 'Search students by name, email, or student ID' }}</label>
                                     <input
                                         id="admin-nav-student-search"
                                         type="search"
@@ -323,182 +587,146 @@
                                             <span class="d-md-none">day streak</span>
                                         </span>
                                     </li>
+                                @endif
 
-                                    <!-- Notifications Dropdown -->
+                                @if(in_array(Auth::user()->role, ['student', 'admin', 'super-admin'], true))
+                                    @php
+                                        $isStudentNotifications = Auth::user()->role === 'student';
+                                        $notificationRoutePrefix = Auth::user()->role.'.';
+                                        $navNotifications = $isStudentNotifications
+                                            ? ($studentNavNotifications ?? collect())
+                                            : ($adminNavNotifications ?? collect());
+                                        $navUnreadCount = $isStudentNotifications
+                                            ? ($unreadStudentNotificationCount ?? 0)
+                                            : ($unreadAdminNotificationCount ?? 0);
+                                    @endphp
                                     <li class="nav-item dropdown">
-                                        <button class="nav-link btn btn-link position-relative border-0" id="studentNotificationsDropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications">
+                                        <button class="nav-link btn btn-link position-relative border-0" id="notificationsDropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications">
                                             <i class="bi bi-bell-fill fs-5" aria-hidden="true"></i>
                                             <span class="d-md-none ms-2">Notifications</span>
-                                            @if(($unreadStudentNotificationCount ?? 0) > 0)
+                                            @if($navUnreadCount > 0)
                                                 <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light" data-notification-unread-badge>
-                                                    {{ $unreadStudentNotificationCount > 99 ? '99+' : $unreadStudentNotificationCount }}
+                                                    {{ $navUnreadCount > 99 ? '99+' : $navUnreadCount }}
                                                     <span class="visually-hidden">unread notifications</span>
                                                 </span>
                                             @endif
                                         </button>
-                                        
-                                        <div class="dropdown-menu dropdown-menu-end p-0 shadow-lg border-0" aria-labelledby="studentNotificationsDropdown" style="min-width: 320px; max-width: min(92vw, 380px);">
-                                            <div class="d-flex justify-content-between align-items-center border-bottom px-3 py-2 bg-body-tertiary rounded-top">
-                                                <strong class="text-dark">Notifications</strong>
-                                                @if(($unreadStudentNotificationCount ?? 0) > 0)
-                                                    <span class="badge bg-primary rounded-pill" data-notification-unread-summary>{{ $unreadStudentNotificationCount }} new</span>
+                                        <div class="dropdown-menu dropdown-menu-end p-0 shadow-lg border-0 notification-dropdown" aria-labelledby="notificationsDropdown">
+                                            <div class="d-flex justify-content-between align-items-center border-bottom px-3 py-3 bg-body-tertiary rounded-top">
+                                                <div>
+                                                    <strong class="text-body d-block">Notifications</strong>
+                                                    <small class="text-secondary">Your latest updates</small>
+                                                </div>
+                                                @if($navUnreadCount > 0)
+                                                    <span class="badge bg-primary rounded-pill" data-notification-unread-summary>{{ $navUnreadCount }} new</span>
                                                 @endif
                                             </div>
-                                            
-                                            <div class="list-group list-group-flush" style="max-height: 360px; overflow-y: auto;">
-                                                @forelse($studentNavNotifications ?? [] as $notification)
-                                                    <div class="list-group-item {{ $notification->read_at ? '' : 'bg-light' }} p-2">
+                                            <div class="notification-dropdown__list">
+                                                @forelse($navNotifications as $notification)
+                                                    @php
+                                                        $notificationIsRead = $notification->read_at !== null;
+                                                        $notificationTitle = $isStudentNotifications
+                                                            ? $notification->subject
+                                                            : ($notification->data['title'] ?? 'Notification');
+                                                        $notificationMessage = $isStudentNotifications
+                                                            ? $notification->message
+                                                            : ($notification->data['message'] ?? (
+                                                                isset($notification->data['report_date'])
+                                                                    ? $notification->data['report_date'].' · '.($notification->data['total_questions_added'] ?? 0).' question(s) added'
+                                                                    : 'You have a new update.'
+                                                            ));
+                                                        $notificationSender = $isStudentNotifications
+                                                            ? ($notification->admin?->name ?? config('app.name', 'LEMU'))
+                                                            : config('app.name', 'LEMU');
+                                                        $notificationReadRoute = $notificationRoutePrefix.'notifications.read';
+                                                        $notificationDeleteRoute = $notificationRoutePrefix.'notifications.destroy';
+                                                    @endphp
+                                                    <div class="notification-dropdown__item {{ $notificationIsRead ? '' : 'is-unread' }}">
                                                         <button
                                                             type="button"
-                                                            class="btn btn-link text-start text-decoration-none w-100 p-1 notification-modal-trigger text-dark"
+                                                            class="notification-dropdown__trigger notification-modal-trigger"
                                                             data-bs-toggle="modal"
-                                                            data-bs-target="#studentNotificationModal"
-                                                            data-notification-title="{{ $notification->subject }}"
-                                                            data-notification-message="{{ $notification->message }}"
-                                                            data-notification-sender="{{ $notification->admin?->name ?? config('app.name', 'LEMU') }}"
-                                                            data-notification-read="{{ $notification->read_at ? 'true' : 'false' }}"
-                                                            data-notification-achievement="{{ str_starts_with($notification->subject, 'Achievement unlocked:') ? 'true' : 'false' }}"
-                                                            data-notification-read-url="{{ route('student.notifications.read', $notification) }}"
-                                                            data-notification-delete-url="{{ route('student.notifications.destroy', $notification) }}"
+                                                            data-bs-target="#notificationModal"
+                                                            data-notification-title="{{ $notificationTitle }}"
+                                                            data-notification-message="{{ $notificationMessage }}"
+                                                            data-notification-sender="{{ $notificationSender }}"
+                                                            data-notification-date="{{ $notification->created_at?->format('M d, Y · h:i A') }}"
+                                                            data-notification-read="{{ $notificationIsRead ? 'true' : 'false' }}"
+                                                            data-notification-achievement="{{ $isStudentNotifications && str_starts_with($notificationTitle, 'Achievement unlocked:') ? 'true' : 'false' }}"
+                                                            data-notification-related-url="{{ ! $isStudentNotifications ? ($notification->data['url'] ?? '') : '' }}"
+                                                            data-notification-read-url="{{ route($notificationReadRoute, $notification->getKey()) }}"
+                                                            data-notification-delete-url="{{ route($notificationDeleteRoute, $notification->getKey()) }}"
                                                         >
-                                                            <strong class="small d-block text-truncate fw-semibold">{{ $notification->subject }}</strong>
-                                                            <span class="small text-muted d-block text-truncate">{{ \Illuminate\Support\Str::limit($notification->message, 80) }}</span>
+                                                            <span class="notification-dropdown__avatar" aria-hidden="true">
+                                                                <i class="bi {{ $isStudentNotifications && str_starts_with($notificationTitle, 'Achievement unlocked:') ? 'bi-trophy-fill' : 'bi-bell-fill' }}"></i>
+                                                            </span>
+                                                            <span class="min-w-0 flex-grow-1">
+                                                                <strong class="d-block text-truncate small">{{ $notificationTitle }}</strong>
+                                                                <span class="d-block text-secondary small text-truncate mt-1">{{ \Illuminate\Support\Str::limit($notificationMessage, 90) }}</span>
+                                                            </span>
+                                                            @unless($notificationIsRead)
+                                                                <span class="notification-dropdown__dot" aria-label="Unread"></span>
+                                                            @endunless
                                                         </button>
                                                     </div>
                                                 @empty
-                                                    <div class="text-center text-muted px-3 py-4">
+                                                    <div class="text-center text-secondary px-3 py-4">
                                                         <i class="bi bi-bell-slash fs-4 d-block mb-1" aria-hidden="true"></i>
                                                         <p class="small mb-0">You have no notifications.</p>
                                                     </div>
                                                 @endforelse
                                             </div>
-                                            
-                                            <div class="d-flex border-top bg-body-tertiary rounded-bottom">
-                                                <a class="dropdown-item flex-fill text-center py-2 border-end small" href="{{ route('student.notifications.index') }}">View all</a>
-                                                <form
-                                                    class="flex-fill"
-                                                    method="POST"
-                                                    action="{{ route('student.notifications.destroy-all') }}"
-                                                    data-confirm-title="Delete all notifications?"
-                                                    data-confirm-text="This will permanently remove all your notifications."
-                                                    data-confirm-button="Delete all"
-                                                >
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="dropdown-item w-100 text-center text-danger py-2 small">Delete all</button>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </li>
-                                @elseif(Auth::user()->role === 'super-admin')
-                                    <li class="nav-item dropdown">
-                                        <button class="nav-link btn btn-link position-relative border-0" id="adminNotificationsDropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Admin notifications">
-                                            <i class="bi bi-bell-fill fs-5" aria-hidden="true"></i>
-                                            <span class="d-md-none ms-2">Notifications</span>
-                                            @if(($unreadAdminNotificationCount ?? 0) > 0)
-                                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light">
-                                                    {{ $unreadAdminNotificationCount > 99 ? '99+' : $unreadAdminNotificationCount }}
-                                                    <span class="visually-hidden">unread notifications</span>
-                                                </span>
-                                            @endif
-                                        </button>
-                                        <div class="dropdown-menu dropdown-menu-end p-0 shadow-lg border-0" aria-labelledby="adminNotificationsDropdown" style="min-width: 320px; max-width: min(92vw, 420px);">
-                                            <div class="border-bottom px-3 py-2 bg-body-tertiary rounded-top">
-                                                <strong class="text-dark">Admin notifications</strong>
-                                                @if(($unreadAdminNotificationCount ?? 0) > 0)
-                                                    <span class="badge bg-primary rounded-pill ms-2">{{ $unreadAdminNotificationCount }} new</span>
-                                                @endif
-                                            </div>
-                                            <div class="list-group list-group-flush" style="max-height: 420px; overflow-y: auto;">
-                                                @forelse($adminNavNotifications ?? [] as $notification)
-                                                    <div class="list-group-item {{ $notification->read_at ? '' : 'bg-light' }} p-3">
-                                                        <a
-                                                            class="admin-notification-trigger d-block text-decoration-none text-reset"
-                                                            href="{{ $notification->data['url'] ?? route('super-admin.question-bank.index') }}"
-                                                            data-notification-read="{{ $notification->read_at ? 'true' : 'false' }}"
-                                                            data-notification-read-url="{{ route('super-admin.notifications.read', $notification->id) }}"
-                                                        >
-                                                        <strong class="small d-block">{{ $notification->data['title'] ?? 'Notification' }}</strong>
-                                                        @if (!empty($notification->data['message']))
-                                                            <span class="small text-muted d-block">{{ $notification->data['message'] }}</span>
-                                                            <span class="btn btn-sm btn-primary mt-2">
-                                                                <i class="bi bi-clipboard-check me-1" aria-hidden="true"></i> Review examination
-                                                            </span>
-                                                        @else
-                                                            <span class="small text-muted d-block">
-                                                                {{ $notification->data['report_date'] ?? $notification->created_at?->toDateString() }}
-                                                                · {{ $notification->data['total_questions_added'] ?? 0 }} question(s) added
-                                                            </span>
-                                                        @endif
-                                                        </a>
-                                                        @if(!empty($notification->data['faculty_counts']))
-                                                            <details class="small mt-2">
-                                                                <summary>View Faculty breakdown</summary>
-                                                                <ul class="mb-0 mt-1 ps-3">
-                                                                    @foreach($notification->data['faculty_counts'] as $facultyCount)
-                                                                        <li>{{ $facultyCount['faculty_name'] }}: {{ $facultyCount['questions_added'] }}</li>
-                                                                    @endforeach
-                                                                </ul>
-                                                            </details>
-                                                        @endif
-                                                        @if(!$notification->read_at)
-                                                            <form method="POST" action="{{ route('super-admin.notifications.read', $notification->id) }}" class="mt-2">
-                                                                @csrf
-                                                                <button class="btn btn-sm btn-outline-primary" type="submit">Mark as read</button>
-                                                            </form>
-                                                        @endif
-                                                    </div>
-                                                @empty
-                                                    <div class="text-center text-muted px-3 py-4">
-                                                        <i class="bi bi-bell-slash fs-4 d-block mb-1" aria-hidden="true"></i>
-                                                        <p class="small mb-0">You have no notifications.</p>
-                                                    </div>
-                                                @endforelse
-                                            </div>
+                                            <a
+                                                class="notification-dropdown__view-all"
+                                                href="{{ route($notificationRoutePrefix.'notifications.index') }}"
+                                                data-notifications-view-all
+                                            >
+                                                View all notifications <i class="bi bi-arrow-up-right ms-1" aria-hidden="true"></i>
+                                            </a>
                                         </div>
                                     </li>
                                 @endif
 
-                                <!-- User Menu Dropdown -->
-                                <li class="nav-item dropdown">
-                                    <a id="navbarDropdown" class="nav-link dropdown-toggle fw-semibold d-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" v-pre>
-                                        @if(Auth::user()->role === 'student' && Auth::user()->profile_picture_path)
-                                            <img src="{{ asset('storage/'.Auth::user()->profile_picture_path) }}" alt="" class="rounded-circle border" width="32" height="32" style="object-fit: cover;">
-                                        @else
+                                @if(in_array(Auth::user()->role, ['admin', 'super-admin'], true))
+                                    <li class="nav-item">
+                                        <span class="nav-link fw-semibold d-flex align-items-center gap-2" aria-label="Signed in as {{ Auth::user()->name }}">
                                             <i class="bi bi-person-circle fs-5" aria-hidden="true"></i>
-                                        @endif
-                                        <span>{{ Auth::user()->name }}</span>
-                                        <span class="badge bg-secondary-subtle text-secondary border fs-6 px-2 py-1">{{ Auth::user()->role_label }}</span>
-                                    </a>
+                                            <span>{{ Auth::user()->name }}</span>
+                                            <span class="badge bg-secondary-subtle text-secondary border fs-6 px-2 py-1">{{ Auth::user()->role_label }}</span>
+                                        </span>
+                                    </li>
+                                @else
+                                    <!-- User Menu Dropdown -->
+                                    <li class="nav-item dropdown">
+                                        <a id="navbarDropdown" class="nav-link dropdown-toggle fw-semibold d-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" v-pre>
+                                            @if(Auth::user()->role === 'student' && Auth::user()->profile_picture_path)
+                                                <img src="{{ asset('storage/'.Auth::user()->profile_picture_path) }}" alt="" class="rounded-circle border" width="32" height="32" style="object-fit: cover;">
+                                            @else
+                                                <i class="bi bi-person-circle fs-5" aria-hidden="true"></i>
+                                            @endif
+                                            <span>{{ Auth::user()->name }}</span>
+                                            <span class="badge bg-secondary-subtle text-secondary border fs-6 px-2 py-1">{{ Auth::user()->role_label }}</span>
+                                        </a>
 
-                                    <div class="dropdown-menu dropdown-menu-end shadow-sm border-0" aria-labelledby="navbarDropdown">
-                                        @if(Auth::user()->role === 'student')
+                                        <div class="dropdown-menu dropdown-menu-end shadow-sm border-0" aria-labelledby="navbarDropdown">
                                             <a class="dropdown-item d-flex align-items-center gap-2" href="{{ route('student.profile') }}">
                                                 <i class="bi bi-person" aria-hidden="true"></i>My Profile
                                             </a>
-                                        @elseif(Auth::user()->role === 'admin')
-                                            <a class="dropdown-item d-flex align-items-center gap-2" href="{{ route('admin.profile') }}">
-                                                <i class="bi bi-person" aria-hidden="true"></i>My Profile
+                                            <a class="dropdown-item d-flex align-items-center gap-2" href="#" data-bs-toggle="modal" data-bs-target="#themeSettingsModal">
+                                                <i class="bi bi-sliders" aria-hidden="true"></i>Settings
                                             </a>
-                                        @elseif(Auth::user()->role === 'super-admin')
-                                            <a class="dropdown-item d-flex align-items-center gap-2" href="{{ route('super-admin.profile') }}">
-                                                <i class="bi bi-person" aria-hidden="true"></i>My Profile
+                                            <hr class="dropdown-divider">
+                                            <a class="dropdown-item d-flex align-items-center gap-2 text-danger" href="{{ route('logout') }}"
+                                               onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                                                <i class="bi bi-box-arrow-right" aria-hidden="true"></i>Logout
                                             </a>
-                                        @endif
-                                        <a class="dropdown-item d-flex align-items-center gap-2" href="#" data-bs-toggle="modal" data-bs-target="#themeSettingsModal">
-                                            <i class="bi bi-sliders" aria-hidden="true"></i>Settings
-                                        </a>
-                                        <hr class="dropdown-divider">
-                                        <a class="dropdown-item d-flex align-items-center gap-2 text-danger" href="{{ route('logout') }}"
-                                           onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-                                            <i class="bi bi-box-arrow-right" aria-hidden="true"></i>Logout
-                                        </a>
 
-                                        <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
-                                            @csrf
-                                        </form>
-                                    </div>
-                                </li>
+                                            <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
+                                                @csrf
+                                            </form>
+                                        </div>
+                                    </li>
+                                @endif
                             @endguest
                         </ul>
                     </div>
@@ -514,7 +742,7 @@
     @php
         $toastNotifications = collect([
             ['type' => 'success', 'title' => 'Success', 'message' => session('success')],
-            ['type' => 'danger', 'title' => 'Something needs attention', 'message' => session('error')],
+            ['type' => 'danger', 'title' => 'Something needs attention', 'message' => session('error') ?? session('invitation_error')],
             ['type' => 'warning', 'title' => 'Please note', 'message' => session('warning')],
             ['type' => 'info', 'title' => 'Information', 'message' => session('info')],
             ['type' => 'success', 'title' => 'Notice', 'message' => session('status')],
@@ -596,36 +824,51 @@
             </div>
         </div>
 
-        @if(Auth::user()->role === 'student')
-            <!-- Student Notification Modal -->
-            <div class="modal fade" id="studentNotificationModal" tabindex="-1" aria-labelledby="studentNotificationModalLabel" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content border-0 shadow">
-                        <div class="modal-header">
-                            <div>
-                                <h2 class="modal-title h5 fw-bold mb-1" id="studentNotificationModalLabel"></h2>
-                                <small class="text-muted">From <span id="studentNotificationSender" class="fw-semibold"></span></small>
+        <div class="modal fade" id="notificationModal" tabindex="-1" aria-labelledby="notificationModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content notification-modal-content">
+                    <div class="modal-header border-0 pb-2">
+                        <div class="d-flex align-items-center gap-3 min-w-0">
+                            <span class="notification-modal__icon" aria-hidden="true"><i class="bi bi-bell-fill"></i></span>
+                            <div class="min-w-0">
+                                <h2 class="modal-title h5 fw-bold mb-1 text-truncate" id="notificationModalLabel"></h2>
+                                <small class="text-secondary">From <span id="notificationModalSender" class="fw-semibold"></span></small>
+                                <small class="d-block text-secondary" id="notificationModalDate"></small>
                             </div>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <div class="modal-body">
-                            <p id="studentNotificationMessage" class="mb-0 text-break lh-base" style="white-space: pre-wrap;"></p>
-                            <p id="studentNotificationReadStatus" class="small text-muted mt-3 mb-0"></p>
-                        </div>
-                        <div class="modal-footer">
-                            <a id="studentAchievementLink" href="{{ route('student.achievements') }}" class="btn btn-outline-primary d-none me-auto">
+                        <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Close notification"></button>
+                    </div>
+                    <div class="modal-body pt-2">
+                        <p id="notificationModalMessage" class="mb-0 text-body text-break lh-lg" style="white-space: pre-wrap;"></p>
+                        <p id="notificationModalReadStatus" class="small text-secondary mt-3 mb-0"></p>
+                    </div>
+                    <div class="modal-footer border-0 pt-1">
+                        @if (Auth::user()->role === 'student')
+                            <a id="notificationAchievementLink" href="{{ route('student.achievements') }}" class="btn btn-outline-primary rounded-pill d-none me-auto">
                                 <i class="bi bi-award me-1" aria-hidden="true"></i>Go to achievements
                             </a>
-                            <form id="studentNotificationDeleteForm" method="POST" class="me-auto">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-outline-danger">Delete</button>
-                            </form>
-                        </div>
+                        @endif
+                        <a id="notificationRelatedLink" href="#" class="btn btn-primary rounded-pill d-none me-auto">
+                            <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Open related page
+                        </a>
+                        <form
+                            id="notificationDeleteForm"
+                            method="POST"
+                            data-confirm-title="Delete this notification?"
+                            data-confirm-text="This notification will be permanently removed from your inbox."
+                            data-confirm-button="Delete notification"
+                        >
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-outline-danger rounded-pill px-3">
+                                <i class="bi bi-trash3 me-1" aria-hidden="true"></i>Delete
+                            </button>
+                        </form>
+                        <button type="button" class="btn btn-light rounded-pill px-3" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>
             </div>
-        @endif
+        </div>
     @endauth
 
     <!-- Bootstrap JS Bundle CDN -->
@@ -745,7 +988,7 @@
             document.getElementById('themePreference').value = localStorage.getItem('lemu-theme') || 'system';
         });
 
-        // Notification Modal Data Population
+        // Notification actions are shared across student, faculty, and admin inboxes.
         function updateUnreadNotificationCount(count) {
             const unreadCount = Math.max(0, Number(count) || 0);
             document.querySelectorAll('[data-notification-unread-badge]').forEach(function (badge) {
@@ -772,77 +1015,140 @@
             });
         }
 
+        async function markNotificationRead(readUrl, sourceElement) {
+            const response = await fetch(readUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Unable to mark notification as read.');
+            }
+
+            const payload = await response.json();
+            if (sourceElement) {
+                sourceElement.dataset.notificationRead = 'true';
+                sourceElement.closest('.notification-dropdown__item')?.classList.remove('is-unread');
+                sourceElement.closest('.notification-dropdown__item')?.querySelector('.notification-dropdown__dot')?.remove();
+            }
+            updateUnreadNotificationCount(payload.unread_count);
+        }
+
+        let activeNotificationTrigger = null;
+        const notificationModal = document.getElementById('notificationModal');
+        document.getElementById('notificationDeleteForm')?.addEventListener('submit', function () {
+            if (this.dataset.confirmed === 'true') {
+                activeNotificationTrigger = null;
+            }
+        });
+
         document.querySelectorAll('.notification-modal-trigger').forEach(function (trigger) {
             trigger.addEventListener('click', function () {
-                document.getElementById('studentNotificationModalLabel').textContent = trigger.dataset.notificationTitle;
-                document.getElementById('studentNotificationMessage').textContent = trigger.dataset.notificationMessage;
-                document.getElementById('studentNotificationSender').textContent = trigger.dataset.notificationSender;
-                document.getElementById('studentNotificationReadStatus').textContent = trigger.dataset.notificationRead === 'true' ? 'Status: Already read' : 'Status: Unread';
-                document.getElementById('studentNotificationDeleteForm').action = trigger.dataset.notificationDeleteUrl;
-                document.getElementById('studentAchievementLink').classList.toggle('d-none', trigger.dataset.notificationAchievement !== 'true');
+                activeNotificationTrigger = trigger;
+                document.getElementById('notificationModalLabel').textContent = trigger.dataset.notificationTitle || 'Notification';
+                document.getElementById('notificationModalMessage').textContent = trigger.dataset.notificationMessage || '';
+                document.getElementById('notificationModalSender').textContent = trigger.dataset.notificationSender || '';
+                document.getElementById('notificationModalDate').textContent = trigger.dataset.notificationDate || '';
+                document.getElementById('notificationModalReadStatus').textContent = trigger.dataset.notificationRead === 'true'
+                    ? 'This notification is already marked as read.'
+                    : 'This notification will be marked as read when you close it.';
+                document.getElementById('notificationDeleteForm').action = trigger.dataset.notificationDeleteUrl;
 
-                if (trigger.dataset.notificationRead !== 'true') {
-                    fetch(trigger.dataset.notificationReadUrl, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                    }).then(function (response) {
-                        if (!response.ok) {
-                            throw new Error('Unable to mark notification as read.');
-                        }
-                        return response.json();
-                    }).then(function (payload) {
-                        document.getElementById('studentNotificationReadStatus').textContent = 'Status: Read';
-                        trigger.dataset.notificationRead = 'true';
-                        trigger.closest('.list-group-item')?.classList.remove('bg-light');
-                        trigger.closest('article')?.classList.remove('border-primary', 'bg-primary-subtle');
-                        trigger.closest('article')?.querySelector('.badge.bg-primary.rounded-pill')?.classList.replace('bg-primary', 'bg-light');
-                        trigger.closest('article')?.querySelector('.badge.rounded-pill')?.classList.replace('text-primary', 'text-secondary');
-                        const articleUnreadBadge = trigger.closest('article')?.querySelector('.badge.bg-primary.rounded-pill');
-                        if (articleUnreadBadge) {
-                            articleUnreadBadge.textContent = 'Read';
-                            articleUnreadBadge.classList.remove('bg-primary', 'text-white');
-                            articleUnreadBadge.classList.add('bg-light', 'text-secondary', 'border');
-                        }
-                        updateUnreadNotificationCount(payload.unread_count);
-                    }).catch(function () {
-                        document.getElementById('studentNotificationReadStatus').textContent = 'Status: Could not update';
-                    });
-                }
+                const achievementLink = document.getElementById('notificationAchievementLink');
+                achievementLink?.classList.toggle('d-none', trigger.dataset.notificationAchievement !== 'true');
+
+                const relatedLink = document.getElementById('notificationRelatedLink');
+                relatedLink.href = trigger.dataset.notificationRelatedUrl || '#';
+                relatedLink.classList.toggle('d-none', !trigger.dataset.notificationRelatedUrl);
             });
         });
 
-        document.querySelectorAll('.admin-notification-trigger').forEach(function (trigger) {
-            trigger.addEventListener('click', function (event) {
-                if (trigger.dataset.notificationRead === 'true') {
+        [document.getElementById('notificationRelatedLink'), document.getElementById('notificationAchievementLink')]
+            .filter(Boolean)
+            .forEach(function (link) {
+                link.addEventListener('click', function (event) {
+                    if (!activeNotificationTrigger || activeNotificationTrigger.dataset.notificationRead === 'true') {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    markNotificationRead(activeNotificationTrigger.dataset.notificationReadUrl, activeNotificationTrigger)
+                        .then(function () {
+                            window.location.assign(link.href);
+                        })
+                        .catch(function () {
+                            window.showToast('This notification could not be marked as read. Please try again.', 'danger');
+                        });
+                });
+            });
+
+        notificationModal?.addEventListener('hidden.bs.modal', function () {
+            const trigger = activeNotificationTrigger;
+            activeNotificationTrigger = null;
+
+            if (trigger && trigger.dataset.notificationRead !== 'true') {
+                markNotificationRead(trigger.dataset.notificationReadUrl, trigger)
+                    .catch(function () {
+                        window.showToast('This notification could not be marked as read. Please try again.', 'danger');
+                    });
+            }
+        });
+
+        document.querySelectorAll('[data-notification-page-open]').forEach(function (link) {
+            link.addEventListener('click', function (event) {
+                const detail = document.querySelector('[data-notification-detail]');
+                if (!detail || detail.dataset.notificationRead === 'true') {
+                    return;
+                }
+                if (new URL(link.href).searchParams.get('notification') === detail.dataset.notificationId) {
                     return;
                 }
 
                 event.preventDefault();
-                if (trigger.dataset.notificationMarking === 'true') {
-                    return;
-                }
-                trigger.dataset.notificationMarking = 'true';
+                markNotificationRead(detail.dataset.notificationReadUrl, null)
+                    .then(function () {
+                        window.location.assign(link.href);
+                    })
+                    .catch(function () {
+                        window.showToast('This notification could not be marked as read. Please try again.', 'danger');
+                    });
+            });
+        });
 
-                fetch(trigger.dataset.notificationReadUrl, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                }).then(function (response) {
-                    if (!response.ok) {
-                        throw new Error('Unable to mark notification as read.');
+        document.querySelectorAll('[data-notification-page-leave]').forEach(function (link) {
+            link.addEventListener('click', function (event) {
+                    const detail = document.querySelector('[data-notification-detail]');
+                    if (!detail || detail.dataset.notificationRead === 'true') {
+                        return;
                     }
 
-                    trigger.dataset.notificationRead = 'true';
-                    window.location.assign(trigger.href);
-                }).catch(function () {
-                    trigger.dataset.notificationMarking = 'false';
-                    window.showToast('This notification could not be marked as read. Please try again.', 'danger');
-                });
+                    event.preventDefault();
+                    markNotificationRead(detail.dataset.notificationReadUrl, null)
+                        .then(function () {
+                            window.location.assign(link.href);
+                        })
+                        .catch(function () {
+                            window.showToast('This notification could not be marked as read. Please try again.', 'danger');
+                        });
+            });
+        });
+
+        document.querySelectorAll('[data-notifications-view-all]').forEach(function (link) {
+            link.addEventListener('click', function (event) {
+                event.preventDefault();
+                const target = new URL(link.href, window.location.origin);
+                const current = new URL(window.location.href);
+                const currentReturnUrl = current.searchParams.get('return_to');
+                const cameFromNotificationPage = /\/notifications\/?$/.test(current.pathname);
+                const returnUrl = cameFromNotificationPage && currentReturnUrl
+                    ? currentReturnUrl
+                    : current.pathname + current.search;
+                target.searchParams.set('return_to', returnUrl);
+                window.location.assign(target.href);
             });
         });
     </script>

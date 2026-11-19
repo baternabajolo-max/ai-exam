@@ -44,6 +44,15 @@ return [
             'after_commit' => false,
         ],
 
+        'database_math' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => env('DB_MATH_QUEUE', 'math-pdf'),
+            'retry_after' => (int) env('DB_MATH_QUEUE_RETRY_AFTER', 7500),
+            'after_commit' => false,
+        ],
+
         'beanstalkd' => [
             'driver' => 'beanstalkd',
             'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),

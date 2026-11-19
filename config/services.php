@@ -1,6 +1,9 @@
 <?php
 
 $pythonBinary = env('PYTHON_BINARY');
+$defaultPythonBinary = PHP_OS_FAMILY === 'Windows'
+    ? 'C:\\Program Files\\Python312\\python.exe'
+    : 'python3';
 
 return [
 
@@ -43,10 +46,12 @@ return [
         ],
     ],
 
-    'pymupdf' => [
-        'python_binary' => $pythonBinary ?: (PHP_OS_FAMILY === 'Windows' ? 'py' : 'python3'),
-        'python_arguments' => $pythonBinary ? [] : (PHP_OS_FAMILY === 'Windows' ? ['-3.12'] : []),
-        'script' => base_path('scripts/extract_pdf_text.py'),
+    'math_pdf' => [
+        'python_binary' => $pythonBinary ?: $defaultPythonBinary,
+        'python_arguments' => [],
+        'script' => base_path('scripts/process_math_pdf.py'),
+        'timeout' => (int) env('MATH_PDF_PROCESS_TIMEOUT', 6900),
+        'mode' => env('MATH_PDF_MODE', 'fast'),
     ],
 
 ];

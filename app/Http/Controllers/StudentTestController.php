@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\ExtractSubtopicText;
+use App\Jobs\ProcessMathPdfJob;
 use App\Models\Module;
 use App\Models\Question;
 use App\Models\Result;
 use App\Models\Reviewer;
 use App\Models\Subtopic;
 use App\Models\Test;
+use App\Models\TestRetakeGrant;
 use App\Models\User;
 use App\Services\AchievementUnlockService;
 use App\Services\AiService;
@@ -50,7 +51,9 @@ class StudentTestController extends Controller
                 ->where('user_id', $student->id)
                 ->latest('created_at')
                 ->latest('id')
-                ->limit(1)])
+                ->limit(1), 'retakeGrants' => fn ($query) => $query
+                ->where('student_id', $student->id)
+                ->whereNull('consumed_at')])
             ->orderBy('available_from')
             ->get();
 
@@ -66,8 +69,9 @@ class StudentTestController extends Controller
 
         abort_unless($test->is_scheduled_exam, 404);
 
+        $retakeGrant = $this->startActiveExamRetake($test);
         $timeLimitSeconds = $this->timeLimitSeconds($test);
-        if ($timeLimitSeconds !== null && session()->get($this->examTimerSessionKey($test)) === null) {
+        if ($retakeGrant === null && $timeLimitSeconds !== null && session()->get($this->examTimerSessionKey($test)) === null) {
             session()->put($this->examTimerSessionKey($test), now()->timestamp);
         }
 
@@ -127,10 +131,12 @@ class StudentTestController extends Controller
             return redirect()->route('student.results.show', $completedResult);
         }
 
+        $retakeGrant = $test->is_scheduled_exam ? $this->startActiveExamRetake($test) : null;
         $timeLimitSeconds = $this->timeLimitSeconds($test);
         $remainingSeconds = null;
         if ($timeLimitSeconds !== null) {
-            $startedAt = session()->get($this->examTimerSessionKey($test));
+            $startedAt = $retakeGrant?->started_at?->timestamp
+                ?? session()->get($this->examTimerSessionKey($test));
             if ($startedAt === null) {
                 $startedAt = now()->timestamp;
                 session()->put($this->examTimerSessionKey($test), $startedAt);
@@ -180,7 +186,7 @@ class StudentTestController extends Controller
                 abort(404);
             }
             $completedResult = $this->findCompletedScheduledExamResult($test);
-            if ($completedResult !== null) {
+            if ($completedResult !== null && $this->activeExamRetakeGrant($test) === null) {
                 return response()->json([
                     'status' => 'already_completed',
                     'result_url' => route('student.results.show', $completedResult),
@@ -591,7 +597,7 @@ class StudentTestController extends Controller
         }
 
         if ($subtopic->text_extraction_status === Subtopic::TEXT_EXTRACTION_PENDING) {
-            ExtractSubtopicText::dispatch($subtopic->id, $subtopic->file_path);
+            ProcessMathPdfJob::dispatch($subtopic->id, $subtopic->file_path);
         }
 
         return $subtopic->text_extraction_status === Subtopic::TEXT_EXTRACTION_COMPLETED
@@ -617,16 +623,25 @@ class StudentTestController extends Controller
             abort(409, 'This general test needs to be refreshed before it can be submitted.');
         }
 
+        $retakeGrant = $test->is_scheduled_exam ? $this->startActiveExamRetake($test) : null;
         $submittedAnswers = $request->input('answers', []);
         $timeLimitSeconds = $this->timeLimitSeconds($test);
+        $startedAtTimestamp = null;
+        $timeTakenSeconds = null;
+        $isTimedOut = false;
         if ($timeLimitSeconds !== null) {
-            $startedAt = session()->get($this->examTimerSessionKey($test));
+            $startedAt = $retakeGrant?->started_at?->timestamp
+                ?? session()->get($this->examTimerSessionKey($test));
             if ($startedAt === null) {
                 $startedAt = now()->timestamp;
                 session()->put($this->examTimerSessionKey($test), $startedAt);
             }
 
-            if (now()->timestamp - (int) $startedAt >= $timeLimitSeconds) {
+            $startedAtTimestamp = (int) $startedAt;
+            $elapsedSeconds = max(0, now()->timestamp - $startedAtTimestamp);
+            $isTimedOut = $elapsedSeconds >= $timeLimitSeconds;
+            $timeTakenSeconds = min($elapsedSeconds, $timeLimitSeconds);
+            if ($isTimedOut) {
                 $submittedAnswers = [];
             }
         }
@@ -689,6 +704,7 @@ class StudentTestController extends Controller
                 'question_text' => preg_replace('/^(Q?\d+[\.\)\-]?\s*)+/i', '', trim($question->question)),
                 'topic' => $question->topic ?? ($test->is_general ? null : $test->topic),
                 'question_type' => $questionType,
+                'difficulty' => $question->difficulty,
                 'options' => is_array($options) ? $options : [],
                 'correct_answer' => $actualCorrect,
                 'user_answer' => $userAns,
@@ -699,28 +715,55 @@ class StudentTestController extends Controller
 
         // Save it securely bypassing any background AI events
         /** @var array{result: Result, already_submitted: bool} $submission */
-        $submission = DB::transaction(function () use ($test, $score, $quizSnapshot): array {
+        $submission = DB::transaction(function () use (
+            $test,
+            $score,
+            $quizSnapshot,
+            $startedAtTimestamp,
+            $timeTakenSeconds,
+            $isTimedOut,
+        ): array {
             if ($test->is_scheduled_exam) {
                 Test::query()->lockForUpdate()->findOrFail($test->id);
 
                 $existingResult = $this->findCompletedScheduledExamResult($test);
-                if ($existingResult !== null) {
+                $retakeGrant = $this->activeExamRetakeGrant($test, true);
+                if ($existingResult !== null && $retakeGrant === null) {
                     return ['result' => $existingResult, 'already_submitted' => true];
                 }
+            } else {
+                $retakeGrant = null;
             }
 
-            $result = Result::withoutEvents(function () use ($test, $score, $quizSnapshot): Result {
+            $result = Result::withoutEvents(function () use (
+                $test,
+                $score,
+                $quizSnapshot,
+                $startedAtTimestamp,
+                $timeTakenSeconds,
+                $isTimedOut,
+            ): Result {
                 $newResult = new Result;
                 $newResult->user_id = auth()->id();
                 $newResult->test_id = $test->id;
                 $newResult->score = $score;
                 $newResult->total_questions = count($quizSnapshot);
-                $newResult->passed = count($quizSnapshot) > 0 && ($score / count($quizSnapshot)) * 100 >= 85;
+                $newResult->passed = count($quizSnapshot) > 0
+                    && ($score / count($quizSnapshot)) * 100 >= Test::PASSING_SCORE_PERCENTAGE;
+                $newResult->started_at = $startedAtTimestamp === null
+                    ? null
+                    : now()->setTimestamp($startedAtTimestamp);
+                $newResult->time_taken_seconds = $timeTakenSeconds;
+                $newResult->submission_type = $isTimedOut ? 'time_expired' : 'manual';
                 $newResult->answers = $quizSnapshot;
                 $newResult->save();
 
                 return $newResult;
             });
+
+            if ($retakeGrant !== null) {
+                $retakeGrant->update(['consumed_at' => now()]);
+            }
 
             return ['result' => $result, 'already_submitted' => false];
         });
@@ -774,7 +817,7 @@ class StudentTestController extends Controller
 
         // Force calculation on the fly so legacy records with old database states adapt immediately
         $result->percentage = $percentage;
-        $result->passed = $percentage >= 85.0;
+        $result->passed = $percentage >= Test::PASSING_SCORE_PERCENTAGE;
 
         return redirect()->back()->with('completed_result_id', $result->id);
     }
@@ -889,7 +932,7 @@ class StudentTestController extends Controller
                 404,
             );
             $completedResult = $this->findCompletedScheduledExamResult($test);
-            if ($completedResult !== null) {
+            if ($completedResult !== null && $this->activeExamRetakeGrant($test) === null) {
                 return $completedResult;
             }
             abort_unless($test->isAvailableAt(), 403, 'This examination is not currently available.');
@@ -909,7 +952,40 @@ class StudentTestController extends Controller
             ->where('user_id', auth()->id())
             ->latest('created_at')
             ->latest('id')
+            ->lockForUpdate()
             ->first();
+    }
+
+    private function activeExamRetakeGrant(Test $test, bool $lockForUpdate = false): ?TestRetakeGrant
+    {
+        $query = TestRetakeGrant::query()
+            ->where('test_id', $test->id)
+            ->where('student_id', auth()->id())
+            ->whereNull('consumed_at');
+
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        return $query->first();
+    }
+
+    private function startActiveExamRetake(Test $test): ?TestRetakeGrant
+    {
+        return DB::transaction(function () use ($test): ?TestRetakeGrant {
+            Test::query()->lockForUpdate()->findOrFail($test->id);
+
+            $grant = $this->activeExamRetakeGrant($test, true);
+            if ($grant === null) {
+                return null;
+            }
+
+            if ($grant->started_at === null) {
+                $grant->update(['started_at' => now()]);
+            }
+
+            return $grant->fresh();
+        });
     }
 
     private function timeLimitSeconds(Test $test): ?int

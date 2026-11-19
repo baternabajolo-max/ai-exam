@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\ExtractSubtopicText;
+use App\Jobs\ProcessMathPdfJob;
 use App\Models\Module;
 use App\Models\Question;
 use App\Models\Result;
@@ -276,7 +276,7 @@ class StudentLearnController extends Controller
         }
 
         if ($subtopic->text_extraction_status === Subtopic::TEXT_EXTRACTION_PENDING) {
-            ExtractSubtopicText::dispatch($subtopic->id, $subtopic->file_path);
+            ProcessMathPdfJob::dispatch($subtopic->id, $subtopic->file_path);
         }
     }
 

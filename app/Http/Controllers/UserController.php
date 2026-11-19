@@ -32,6 +32,7 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'department_id' => ['required', 'exists:departments,id'],
+            'course_ids' => ['prohibited'],
         ]);
 
         $admin = User::create([
@@ -109,20 +110,22 @@ class UserController extends Controller
 
         $validated = $request->validate([
             'department_id' => ['sometimes', 'required', 'integer', 'exists:departments,id'],
+            'course_ids' => ['prohibited'],
             'password' => ['nullable', 'string', 'confirmed', PasswordRule::min(8)->symbols(), 'regex:/[A-Z]/'],
         ]);
 
         $changedDepartment = isset($validated['department_id']);
-        if ($changedDepartment) {
-            $user->update([
-                'department_id' => $validated['department_id'],
-                'course_id' => null,
-            ]);
-        }
-
         $changedPassword = filled($validated['password'] ?? null);
+        $updates = [];
+        if ($changedDepartment) {
+            $updates['department_id'] = $validated['department_id'];
+            $updates['course_id'] = null;
+        }
         if ($changedPassword) {
-            $user->update(['password' => Hash::make($validated['password'])]);
+            $updates['password'] = Hash::make($validated['password']);
+        }
+        if ($updates !== []) {
+            $user->update($updates);
         }
 
         $message = $changedPassword && ! $changedDepartment

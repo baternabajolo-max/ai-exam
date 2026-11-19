@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Course;
 use App\Models\Department;
 use App\Models\Module;
+use App\Models\QuestionBankItem;
 use App\Models\Result;
 use App\Models\StudySession;
 use App\Models\Subtopic;
@@ -678,6 +679,93 @@ class RoleDashboardAnalyticsTest extends TestCase
         $this->assertSame(2, $response->viewData('departmentDatasets')[0]['data'][11]);
     }
 
+    public function test_super_admin_can_filter_dashboard_analytics_to_one_academic_program(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-03-20 12:00:00'));
+
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
+        $otherCourse = Course::create(['name' => 'Data Science', 'code' => 'DS', 'department_id' => $department->id]);
+        $faculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id, 'course_id' => $course->id]);
+        $bankFaculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id, 'course_id' => null]);
+        User::factory()->create(['role' => 'admin', 'department_id' => $department->id, 'course_id' => $otherCourse->id]);
+        QuestionBankItem::create([
+            'course_id' => $course->id,
+            'author_id' => $bankFaculty->id,
+            'question' => 'Question for Software Engineering?',
+            'options' => ['A', 'B', 'C', 'D'],
+            'correct_answer' => 'A',
+        ]);
+        $student = User::factory()->create([
+            'name' => 'Alpha Student',
+            'role' => 'student',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $otherStudent = User::factory()->create([
+            'name' => 'Beta Student',
+            'role' => 'student',
+            'department_id' => $department->id,
+            'course_id' => $otherCourse->id,
+        ]);
+        $test = StudentTest::create([
+            'title' => 'Software Engineering General Test',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+            'is_general' => true,
+        ]);
+        $otherTest = StudentTest::create([
+            'title' => 'Data Science General Test',
+            'department_id' => $department->id,
+            'course_id' => $otherCourse->id,
+            'is_general' => true,
+        ]);
+        $this->createResult($student, $test, 8, 10, now()->subDay());
+        $this->createResult($otherStudent, $otherTest, 2, 10, now()->subDay());
+
+        $response = $this->actingAs(User::factory()->create(['role' => 'super-admin']))
+            ->get(route('super-admin.dashboard', [
+                'course_id' => $course->id,
+                'period' => 7,
+                'student_search' => 'Alpha',
+            ]))
+            ->assertSee('Viewing engagement, assessment outcomes, and enrollment trends for Software Engineering.')
+            ->assertSee('name="course_id"', false)
+            ->assertSee('id="super-admin-program-filter"', false)
+            ->assertSee('Software Engineering')
+            ->assertDontSee('Beta Student')
+            ->assertViewHas('selectedCourseId', $course->id)
+            ->assertViewHas('selectedDepartmentId', $department->id)
+            ->assertViewHas('totalAdmins', 2)
+            ->assertViewHas('totalStudents', 1)
+            ->assertViewHas('activeStudentCount', 1)
+            ->assertViewHas('departmentStudentTotal', 1)
+            ->assertViewHas('matchingStudents', fn ($students): bool => $students->count() === 1
+                && $students->first()->id === $student->id)
+            ->assertViewHas('departmentAnalytics', fn ($analytics): bool => $analytics->count() === 1
+                && $analytics->first()['name'] === 'Software Engineering'
+                && $analytics->first()['participants'] === 1
+                && $analytics->first()['average_score'] === 80);
+
+        $this->assertSame('Software Engineering', $response->viewData('departmentDatasets')[0]['label']);
+        $this->assertSame(1, $response->viewData('departmentDatasets')[0]['data'][11]);
+
+        $module = Module::create(['title' => 'Data Science', 'department_id' => $department->id, 'course_id' => $otherCourse->id]);
+        $subtopic = Subtopic::create(['title' => 'Statistics', 'module_id' => $module->id]);
+        StudySession::create([
+            'user_id' => $otherStudent->id,
+            'module_id' => $module->id,
+            'subtopic_id' => $subtopic->id,
+            'activity_date' => '2026-03-20',
+            'active_seconds' => 600,
+            'started_at' => '2026-03-20 10:00:00',
+            'last_heartbeat_at' => '2026-03-20 10:10:00',
+        ]);
+        $this->actingAs(User::factory()->create(['role' => 'super-admin']))
+            ->get(route('super-admin.dashboard', ['course_id' => $course->id, 'period' => 7]))
+            ->assertViewHas('activeStudentCount', 1);
+    }
+
     public function test_super_admin_dashboard_rejects_an_unknown_college_filter(): void
     {
         $superAdmin = User::factory()->create(['role' => 'super-admin']);
@@ -703,7 +791,7 @@ class RoleDashboardAnalyticsTest extends TestCase
             ->assertOk()
             ->assertSee('Institution oversight')
             ->assertSee('Faculty accounts')
-            ->assertSee('College assignment, individual Question Bank size')
+            ->assertSee('Academic program association, individual Question Bank size')
             ->assertSee('Recent exam submissions')
             ->assertSee(route('super-admin.question-bank.index'))
             ->assertSee(route('super-admin.item-analysis.index'))
@@ -712,6 +800,58 @@ class RoleDashboardAnalyticsTest extends TestCase
 
         $this->assertStringContainsString('>1</p>', $response->getContent());
         $this->assertStringContainsString('>0</p>', $response->getContent());
+    }
+
+    public function test_super_admin_monitoring_filters_faculty_and_exam_results_by_program(): void
+    {
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
+        $otherCourse = Course::create(['name' => 'Data Science', 'code' => 'DS', 'department_id' => $department->id]);
+        $faculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $otherFaculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $selectedStudent = User::factory()->create(['role' => 'student', 'department_id' => $department->id, 'course_id' => $course->id]);
+        $otherStudent = User::factory()->create(['role' => 'student', 'department_id' => $department->id, 'course_id' => $otherCourse->id]);
+        QuestionBankItem::create([
+            'course_id' => $course->id,
+            'author_id' => $faculty->id,
+            'question' => 'Software Engineering question?',
+            'options' => ['A', 'B', 'C', 'D'],
+            'correct_answer' => 'A',
+        ]);
+        QuestionBankItem::create([
+            'course_id' => $otherCourse->id,
+            'author_id' => $otherFaculty->id,
+            'question' => 'Data Science question?',
+            'options' => ['A', 'B', 'C', 'D'],
+            'correct_answer' => 'B',
+        ]);
+        $exam = StudentTest::create([
+            'title' => 'Software Engineering Midterm',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+            'created_by' => $faculty->id,
+            'is_scheduled_exam' => true,
+        ]);
+        $otherExam = StudentTest::create([
+            'title' => 'Data Science Midterm',
+            'department_id' => $department->id,
+            'course_id' => $otherCourse->id,
+            'created_by' => $otherFaculty->id,
+            'is_scheduled_exam' => true,
+        ]);
+        $this->createResult($selectedStudent, $exam, 8, 10, now()->subDay());
+        $this->createResult($otherStudent, $otherExam, 5, 10, now()->subDay());
+
+        $this->actingAs(User::factory()->create(['role' => 'super-admin']))
+            ->get(route('super-admin.monitoring', ['course_id' => $course->id]))
+            ->assertSee('for Software Engineering')
+            ->assertSee('Software Engineering')
+            ->assertDontSee('Data Science Midterm')
+            ->assertViewHas('faculties', fn ($faculties): bool => $faculties->count() === 1
+                && $faculties->first()->id === $faculty->id
+                && $faculties->first()->question_bank_items_count === 1)
+            ->assertViewHas('recentAssessments', fn ($assessments): bool => $assessments->count() === 1
+                && $assessments->first()->test->id === $exam->id);
     }
 
     public function test_role_dashboard_period_filters_reject_unsupported_ranges(): void

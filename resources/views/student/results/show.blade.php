@@ -242,7 +242,13 @@
                     </a>
                 @endif
 
-                <a href="{{ $returnUrl }}" class="btn btn-emerald-outline rounded-pill px-5 py-2.5 fw-semibold shadow-sm">
+                <a
+                    href="{{ $returnUrl }}"
+                    class="btn btn-emerald-outline rounded-pill px-5 py-2.5 fw-semibold shadow-sm"
+                    @if (! $isAdminView && $result->test?->is_scheduled_exam)
+                        data-close-exam-tab
+                    @endif
+                >
                     {{ $returnLabel }}
                 </a>
             </div>
@@ -423,3 +429,39 @@
 
 </div>
 @endsection
+
+@if (! $isAdminView && $result->test?->is_scheduled_exam)
+    @push('scripts')
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const returnLink = document.querySelector('[data-close-exam-tab]');
+
+                if (!returnLink) {
+                    return;
+                }
+
+                returnLink.addEventListener('click', function (event) {
+                    event.preventDefault();
+
+                    if ('BroadcastChannel' in window) {
+                        const examUpdates = new BroadcastChannel('lemu-exam-updates');
+                        examUpdates.postMessage({ type: 'exam-submitted' });
+                        examUpdates.close();
+                    }
+
+                    if (window.opener && !window.opener.closed) {
+                        window.opener.location.reload();
+                    }
+
+                    window.close();
+
+                    window.setTimeout(function () {
+                        if (!window.closed) {
+                            window.location.assign(returnLink.href);
+                        }
+                    }, 100);
+                });
+            });
+        </script>
+    @endpush
+@endif

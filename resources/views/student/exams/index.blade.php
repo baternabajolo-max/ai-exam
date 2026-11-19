@@ -240,13 +240,14 @@
         @forelse ($exams as $exam)
             @php($status = $exam->scheduleStatus())
             @php($completedResult = $exam->results->first())
+            @php($retakeGrant = $exam->retakeGrants->first())
             <div class="col-12 col-lg-6">
                 <article class="student-exams__card">
                     <div class="student-exams__card-body">
                         <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
                             <span class="badge rounded-pill student-exams__status student-exams__status--{{ $completedResult ? 'completed' : strtolower($status) }}">
                                 <i class="bi {{ $completedResult ? 'bi-check-circle-fill' : ($status === 'Active' ? 'bi-unlock-fill' : ($status === 'Closed' ? 'bi-lock-fill' : 'bi-clock-fill')) }} me-1" aria-hidden="true"></i>
-                                {{ $completedResult ? 'Completed' : $status }}
+                                {{ $retakeGrant ? 'Retake available' : ($completedResult ? 'Completed' : $status) }}
                             </span>
                             @if ($completedResult)<span class="small text-muted"><i class="bi bi-check2 me-1" aria-hidden="true"></i>Attempt submitted</span>@endif
                         </div>
@@ -259,6 +260,17 @@
                         </dl>
                         @if ($completedResult)
                             <a class="btn btn-outline-primary student-exams__action mt-auto align-self-start" href="{{ route('student.results.show', $completedResult) }}"><i class="bi bi-bar-chart-line" aria-hidden="true"></i>View results</a>
+                            @if ($retakeGrant && $status === 'Active')
+                                <button
+                                    class="btn btn-primary student-exams__action mt-2 align-self-start"
+                                    type="button"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#takeExamConfirmation"
+                                    data-exam-start-url="{{ route('student.exams.start', $exam) }}"
+                                    data-exam-title="{{ $exam->title }}"
+                                    data-exam-retake="true"
+                                ><i class="bi bi-arrow-repeat" aria-hidden="true"></i>Take retake</button>
+                            @endif
                         @elseif ($status === 'Active')
                             <button
                                 class="btn btn-primary student-exams__action mt-auto align-self-start"
@@ -300,12 +312,12 @@
             <div class="modal-body px-4 py-3">
                 <div class="student-exams__notice mb-3"><i class="bi bi-exclamation-circle-fill me-1" aria-hidden="true"></i><span id="takeExamName" class="fw-semibold"></span></div>
                 <p class="text-secondary mb-0" id="takeExamConfirmationMessage">
-                    You can take this examination only once. Proceed to begin; your attempt will not be submitted until you finish, time expires, or you close or leave the examination.
+                    <span id="takeExamNotice">You can take this examination only once. Proceed to begin; your attempt will not be submitted until you finish, time expires, or you close or leave the examination.</span>
                 </p>
             </div>
             <div class="modal-footer border-top-0 px-4 pb-4 pt-2">
                 <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-                <form id="startExamForm" method="POST" action="#">
+                <form id="startExamForm" method="POST" action="#" target="_blank">
                     @csrf
                     <button id="proceedToExam" class="btn btn-primary rounded-pill px-4" type="submit">Proceed</button>
                 </form>
@@ -318,7 +330,12 @@
 document.addEventListener('DOMContentLoaded', function () {
     const confirmationModal = document.getElementById('takeExamConfirmation');
     const examName = document.getElementById('takeExamName');
+    const examNotice = document.getElementById('takeExamNotice');
     const startExamForm = document.getElementById('startExamForm');
+
+    startExamForm.addEventListener('submit', function () {
+        bootstrap.Modal.getOrCreateInstance(confirmationModal).hide();
+    });
 
     confirmationModal.addEventListener('show.bs.modal', function (event) {
         const takeExamButton = event.relatedTarget;
@@ -328,7 +345,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
         examName.textContent = takeExamButton.dataset.examTitle || 'Examination';
         startExamForm.action = takeExamButton.dataset.examStartUrl || '#';
+        examNotice.textContent = takeExamButton.dataset.examRetake === 'true'
+            ? 'This is your one additional attempt. It will be submitted when you finish, time expires, or you close or leave the examination.'
+            : 'You can take this examination only once. Proceed to begin; your attempt will not be submitted until you finish, time expires, or you close or leave the examination.';
     });
+
+    if ('BroadcastChannel' in window) {
+        const examUpdates = new BroadcastChannel('lemu-exam-updates');
+        examUpdates.addEventListener('message', function (event) {
+            if (event.data?.type === 'exam-submitted') {
+                window.location.reload();
+            }
+        });
+    }
 });
 </script>
 @endsection

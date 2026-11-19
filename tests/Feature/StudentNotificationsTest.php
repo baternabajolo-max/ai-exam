@@ -30,21 +30,87 @@ class StudentNotificationsTest extends TestCase
 
         $this->actingAs($student)
             ->get(route('student.dashboard'))
-            ->assertSee('studentNotificationsDropdown')
+            ->assertSee('notificationsDropdown')
             ->assertSee('Review reminder')
-            ->assertSee('View all')
-            ->assertSee('Delete all notifications')
-            ->assertSee('data-confirm-title="Delete all notifications?"', false)
-            ->assertSee('js/confirm-actions.js')
-            ->assertDontSee('onsubmit="return confirm(', false)
+            ->assertSee('View all notifications')
+            ->assertSee('notification-modal-trigger')
+            ->assertSee('notification-dropdown__list')
+            ->assertSee('data-bs-target="#notificationModal"', false)
             ->assertSee(route('student.notifications.index'), false);
 
         $this->actingAs($student)
-            ->get(route('student.notifications.index'))
+            ->get(route('student.notifications.index', ['notification' => $student->receivedNotifications()->first()->id]))
             ->assertSee('Please take this week’s quiz.')
-            ->assertSee('View details')
-            ->assertSee('studentNotificationModal')
-            ->assertSee('Ada Administrator');
+            ->assertSee('Ada Administrator')
+            ->assertSee('Mark all as read')
+            ->assertDontSee('Go back')
+            ->assertDontSee('Your updates')
+            ->assertDontSee('Keep track of important messages and activity.')
+            ->assertSee('Inbox')
+            ->assertSee('notifications-page__sidebar', false)
+            ->assertSee('notifications-page__reader', false)
+            ->assertSee('Close notification');
+    }
+
+    public function test_student_nav_shows_only_five_recent_notifications(): void
+    {
+        $student = User::factory()->create(['role' => 'student']);
+
+        foreach (range(1, 7) as $number) {
+            $notification = StudentNotification::create([
+                'student_id' => $student->id,
+                'admin_id' => null,
+                'subject' => "Notice {$number}",
+                'message' => "Message {$number}",
+            ]);
+            $notification->forceFill(['created_at' => now()->addMinutes($number)])->save();
+        }
+
+        $this->actingAs($student)
+            ->get(route('student.dashboard'))
+            ->assertSee('Notice 3')
+            ->assertSee('Notice 7')
+            ->assertDontSee('Notice 1')
+            ->assertDontSee('Notice 2')
+            ->assertSee('notification-dropdown__list');
+    }
+
+    public function test_student_notification_detail_is_marked_read_when_closed_and_returns_to_previous_page(): void
+    {
+        $student = User::factory()->create(['role' => 'student']);
+        $notification = StudentNotification::create([
+            'student_id' => $student->id,
+            'admin_id' => null,
+            'subject' => 'Course update',
+            'message' => 'The exam schedule changed.',
+        ]);
+        $returnTo = '/student/exams?program=engineering';
+
+        $this->actingAs($student)
+            ->get(route('student.notifications.index', [
+                'notification' => $notification->id,
+                'return_to' => $returnTo,
+            ]))
+            ->assertSee('The exam schedule changed.')
+            ->assertSee('data-notification-detail', false)
+            ->assertSee('data-notification-read="false"', false)
+            ->assertSee('name="close_detail"', false)
+            ->assertDontSee('name="leave_page"', false);
+
+        $this->assertNull($notification->fresh()->read_at);
+
+        $this->post(route('student.notifications.read', $notification), [
+            'close_detail' => 1,
+            'return_to' => $returnTo,
+        ])
+            ->assertRedirect(route('student.notifications.index', ['return_to' => $returnTo]));
+
+        $this->assertNotNull($notification->fresh()->read_at);
+
+        $this->post(route('student.notifications.read', $notification), [
+            'leave_page' => 1,
+            'return_to' => $returnTo,
+        ])->assertRedirect($returnTo);
     }
 
     public function test_student_can_mark_an_owned_notification_as_read(): void

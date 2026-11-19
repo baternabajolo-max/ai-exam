@@ -6,6 +6,8 @@ use App\Models\Module;
 use App\Models\Result;
 use App\Models\StudentNotification;
 use App\Models\Subtopic;
+use App\Models\Test;
+use App\Models\TestRetakeGrant;
 use App\Models\User;
 use App\Services\LeaderboardPointsService;
 use App\Services\StudentReadinessService;
@@ -15,6 +17,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class AdminController extends Controller
@@ -303,6 +306,65 @@ class AdminController extends Controller
         return view('admin.notifications.index', compact('notifications'));
     }
 
+    public function activateExamRetake(Request $request, User $student, Test $test): RedirectResponse
+    {
+        $actor = $request->user();
+        abort_unless(
+            $actor->role === 'super-admin'
+                || ($actor->role === 'admin' && (int) $actor->department_id === (int) $test->department_id),
+            404,
+        );
+
+        $alreadyActive = DB::transaction(function () use ($actor, $student, $test): bool {
+            $lockedTest = Test::query()->lockForUpdate()->findOrFail($test->id);
+            abort_unless(
+                $student->role === 'student'
+                    && $student->course_id !== null
+                    && (int) $student->department_id === (int) $lockedTest->department_id
+                    && (int) $student->course_id === (int) $lockedTest->course_id
+                    && $lockedTest->is_scheduled_exam
+                    && $lockedTest->isAvailableAt()
+                    && $lockedTest->results()->where('user_id', $student->id)->exists(),
+                404,
+            );
+
+            $grant = TestRetakeGrant::query()
+                ->where('test_id', $lockedTest->id)
+                ->where('student_id', $student->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($grant !== null && $grant->consumed_at === null) {
+                return true;
+            }
+
+            if ($grant === null) {
+                TestRetakeGrant::create([
+                    'test_id' => $lockedTest->id,
+                    'student_id' => $student->id,
+                    'granted_by' => $actor->id,
+                    'granted_at' => now(),
+                ]);
+            } else {
+                $grant->update([
+                    'granted_by' => $actor->id,
+                    'granted_at' => now(),
+                    'started_at' => null,
+                    'consumed_at' => null,
+                ]);
+            }
+
+            return false;
+        });
+
+        return back()->with(
+            'success',
+            $alreadyActive
+                ? 'A retake is already active for this examination.'
+                : 'One retake has been activated for '.$student->name.'.',
+        );
+    }
+
     public function profile()
     {
         return view('admin.profile.index', [
@@ -420,6 +482,22 @@ class AdminController extends Controller
         });
 
         $generalTestHistory = $this->generalTestHistory($student);
+        $examHistory = Result::query()
+            ->where('user_id', $student->id)
+            ->whereHas('test', fn ($query) => $query
+                ->where('is_scheduled_exam', true)
+                ->where('department_id', $student->department_id)
+                ->where('course_id', $student->course_id))
+            ->with([
+                'test.course:id,name',
+                'test.retakeGrants' => fn ($query) => $query
+                    ->where('student_id', $student->id)
+                    ->whereNull('consumed_at'),
+            ])
+            ->latest('created_at')
+            ->latest('id')
+            ->get()
+            ->groupBy('test_id');
 
         $periodResults = Result::query()
             ->where('user_id', $student->id)
@@ -472,6 +550,7 @@ class AdminController extends Controller
             'modules',
             'moduleProgress',
             'generalTestHistory',
+            'examHistory',
             'analyticsDays',
             'periodStartDate',
             'periodEndDate',

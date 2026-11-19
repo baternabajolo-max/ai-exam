@@ -80,17 +80,11 @@ class LeaderboardTest extends TestCase
             'department_id' => $department->id,
         ]))
             ->get(route('admin.leaderboard'))
-            ->assertSee('Software Student')
-            ->assertSee('Systems Student')
-            ->assertSee('15 pts')
-            ->assertDontSee('Foreign Student');
+            ->assertRedirect(route('faculty.results.index'));
 
         $this->actingAs(User::factory()->create(['role' => 'super-admin']))
             ->get(route('super-admin.leaderboard', ['department_id' => $department->id]))
-            ->assertSee('Software Student')
-            ->assertSee('Systems Student')
-            ->assertSee('15 pts')
-            ->assertDontSee('Foreign Student');
+            ->assertRedirect(route('super-admin.results.index', ['college_id' => $department->id]));
 
         $this->assertDatabaseHas('users', [
             'id' => $student->id,
@@ -121,7 +115,7 @@ class LeaderboardTest extends TestCase
             ->assertRedirect(route('super-admin.dashboard'));
     }
 
-    public function test_student_and_admin_leaderboards_do_not_mix_unassigned_students(): void
+    public function test_student_leaderboard_remains_scoped_and_faculty_legacy_route_redirects_to_results(): void
     {
         $unassignedStudent = User::factory()->create([
             'name' => 'Unassigned Viewer',
@@ -146,18 +140,16 @@ class LeaderboardTest extends TestCase
 
         $this->actingAs($faculty)
             ->get(route('admin.leaderboard'))
-            ->assertDontSee('Unassigned Student')
-            ->assertSee('No Leaderboard Activity Yet');
+            ->assertRedirect(route('faculty.results.index'));
     }
 
-    public function test_super_admin_leaderboard_falls_back_to_a_valid_college_for_an_unknown_filter(): void
+    public function test_super_admin_leaderboard_redirects_to_results_with_the_college_filter(): void
     {
-        Department::create(['name' => 'College A', 'code' => 'COA']);
-        Department::create(['name' => 'College B', 'code' => 'COB']);
+        $college = Department::create(['name' => 'College A', 'code' => 'COA']);
 
         $this->actingAs(User::factory()->create(['role' => 'super-admin']))
-            ->get(route('super-admin.leaderboard', ['department_id' => 999]))
-            ->assertSee('College A Top Students');
+            ->get(route('super-admin.leaderboard', ['department_id' => $college->id]))
+            ->assertRedirect(route('super-admin.results.index', ['college_id' => $college->id]));
     }
 
     private function createCourseQuiz(

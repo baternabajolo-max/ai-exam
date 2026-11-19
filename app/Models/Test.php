@@ -12,6 +12,8 @@ class Test extends Model
 {
     use HasFactory;
 
+    public const PASSING_SCORE_PERCENTAGE = 85;
+
     public const APPROVAL_STATUS_PENDING = 'pending';
 
     public const APPROVAL_STATUS_APPROVED = 'approved';
@@ -39,6 +41,7 @@ class Test extends Model
         'is_scheduled_exam',
         'is_published',
         'approval_status',
+        'rejection_comment',
         'reviewed_by',
         'reviewed_at',
         'available_from',
@@ -57,6 +60,11 @@ class Test extends Model
     public function results(): HasMany
     {
         return $this->hasMany(Result::class);
+    }
+
+    public function retakeGrants(): HasMany
+    {
+        return $this->hasMany(TestRetakeGrant::class);
     }
 
     public function department(): BelongsTo
@@ -127,5 +135,14 @@ class Test extends Model
             && $this->approval_status === self::APPROVAL_STATUS_APPROVED
             && ($this->available_from === null || $this->available_from->lte($now))
             && ($this->available_until === null || $this->available_until->gte($now));
+    }
+
+    public function isEditableBy(User $user, ?Carbon $now = null): bool
+    {
+        $now ??= now();
+
+        return $this->is_scheduled_exam
+            && (int) $this->created_by === (int) $user->getKey()
+            && $this->available_from?->isAfter($now) === true;
     }
 }

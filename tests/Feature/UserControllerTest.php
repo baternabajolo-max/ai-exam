@@ -31,7 +31,7 @@ class UserControllerTest extends TestCase
             ->assertDontSee('<th>Question Bank</th>', false);
     }
 
-    public function test_admin_can_assign_multiple_faculty_members_to_the_same_college(): void
+    public function test_faculty_accounts_are_created_for_a_college_without_program_assignments(): void
     {
         $superAdmin = User::factory()->create(['role' => 'super-admin']);
         $department = Department::create(['name' => 'Science', 'code' => 'SCI']);
@@ -46,6 +46,10 @@ class UserControllerTest extends TestCase
                 ])
                 ->assertRedirect(route('super-admin.users.index'))
                 ->assertSessionHas('success');
+
+            $faculty = User::query()->where('email', 'faculty-'.$index.'@example.test')->firstOrFail();
+            $this->assertSame($department->id, $faculty->department_id);
+            $this->assertFalse($faculty->handledCourses()->exists());
         }
 
         $this->assertSame(
@@ -56,6 +60,55 @@ class UserControllerTest extends TestCase
                 ->whereNull('course_id')
                 ->count(),
         );
+
+        $this->actingAs($superAdmin)
+            ->get(route('super-admin.users.index'))
+            ->assertSee($department->name)
+            ->assertDontSee('Assigned programs')
+            ->assertDontSee('course_ids[]');
+    }
+
+    public function test_program_assignments_are_rejected_when_creating_or_editing_faculty(): void
+    {
+        $superAdmin = User::factory()->create(['role' => 'super-admin']);
+        $science = Department::create(['name' => 'Science', 'code' => 'SCI']);
+        $engineering = Department::create(['name' => 'Engineering', 'code' => 'ENG']);
+        $biology = Course::create(['name' => 'Biology', 'code' => 'BIO', 'department_id' => $science->id]);
+        $physics = Course::create(['name' => 'Physics', 'code' => 'PHY', 'department_id' => $science->id]);
+        $civilEngineering = Course::create(['name' => 'Civil Engineering', 'code' => 'CE', 'department_id' => $engineering->id]);
+        Notification::fake();
+        $this->actingAs($superAdmin);
+
+        $this->post(route('super-admin.users.store'), [
+            'name' => 'Assigned Faculty',
+            'email' => 'assigned-faculty@example.test',
+            'department_id' => $science->id,
+            'course_ids' => [$civilEngineering->id],
+        ])->assertSessionHasErrors('course_ids');
+        $this->assertDatabaseMissing('users', ['email' => 'assigned-faculty@example.test']);
+
+        $faculty = User::factory()->create([
+            'role' => 'admin',
+            'department_id' => $science->id,
+        ]);
+        $faculty->handledCourses()->attach($biology);
+
+        $this->put(route('super-admin.users.update', $faculty), [
+            'department_id' => $engineering->id,
+            'course_ids' => [$physics->id],
+        ])->assertSessionHasErrors('course_ids');
+        $this->assertSame($science->id, $faculty->fresh()->department_id);
+        $this->assertSame(
+            [$biology->id],
+            $faculty->fresh()->handledCourses()->pluck('courses.id')->all(),
+        );
+
+        $this->put(route('super-admin.users.update', $faculty), [
+            'department_id' => $engineering->id,
+        ])
+            ->assertRedirect(route('super-admin.users.index'))
+            ->assertSessionHas('success', 'Faculty account updated successfully.');
+        $this->assertSame($engineering->id, $faculty->fresh()->department_id);
     }
 
     public function test_resending_an_invitation_replaces_the_old_token_and_hides_action_after_activation(): void
@@ -132,5 +185,10 @@ class UserControllerTest extends TestCase
             ->post(route('super-admin.users.resend-invitation', $faculty))
             ->assertRedirect(route('super-admin.users.index'))
             ->assertSessionHas('error', 'This faculty account is already active.');
+
+        $this->get(route('super-admin.users.index'))
+            ->assertSee('This faculty account is already active.')
+            ->assertSee('toast-danger')
+            ->assertDontSee('alert alert-danger', false);
     }
 }

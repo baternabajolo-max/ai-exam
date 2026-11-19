@@ -50,7 +50,7 @@
                         <span class="input-group-text bg-white border-end-0 ps-3 text-muted">
                             <i class="bi bi-search"></i>
                         </span>
-                        <input type="text" id="studentSearchInput" class="form-control border-start-0 ps-0 shadow-none" placeholder="Search by name, email, or college...">
+                        <input type="text" id="studentSearchInput" class="form-control border-start-0 ps-0 shadow-none" placeholder="Search by name, email, or program...">
                     </div>
                 </div>
 
@@ -67,7 +67,7 @@
                         <thead class="bg-light-subtle border-bottom">
                             <tr class="text-uppercase text-muted fs-8 tracking-wider">
                                 <th class="ps-4 py-3 fw-bold">Student Profile</th>
-                                <th class="py-3 fw-bold">College</th>
+                                <th class="py-3 fw-bold">Program</th>
                                 <th class="py-3 fw-bold">Status</th>
                                 <th class="text-end pe-4 py-3 fw-bold">Approval Actions</th>
                             </tr>
@@ -88,10 +88,10 @@
                                     </div>
                                 </td>
 
-                                {{-- College --}}
-                                <td class="py-3 student-college">
+                                {{-- Program --}}
+                                <td class="py-3 student-program">
                                     <span class="badge bg-light text-dark border px-2.5 py-1.5 rounded-2 fw-medium">
-                                        <i class="bi bi-building me-1 text-muted"></i>{{ $student->department->name ?? 'Unassigned' }}
+                                        <i class="bi bi-mortarboard me-1 text-muted"></i>{{ $student->course->name ?? 'Unassigned' }}
                                     </span>
                                 </td>
 
@@ -155,7 +155,7 @@
                         <thead class="bg-light-subtle border-bottom">
                             <tr class="text-uppercase text-muted fs-8 tracking-wider">
                                 <th class="ps-4 py-3 fw-bold">Student Profile</th>
-                                <th class="py-3 fw-bold">College</th>
+                                <th class="py-3 fw-bold">Program</th>
                                 <th class="py-3 fw-bold">Status</th>
                                 <th class="text-end pe-4 py-3 fw-bold">Manage Access</th>
                             </tr>
@@ -176,10 +176,10 @@
                                     </div>
                                 </td>
 
-                                {{-- College --}}
-                                <td class="py-3 student-college">
+                                {{-- Program --}}
+                                <td class="py-3 student-program">
                                     <span class="badge bg-light text-dark border px-2.5 py-1.5 rounded-2 fw-medium">
-                                        <i class="bi bi-building me-1 text-muted"></i>{{ $student->department->name ?? 'Unassigned' }}
+                                        <i class="bi bi-mortarboard me-1 text-muted"></i>{{ $student->course->name ?? 'Unassigned' }}
                                     </span>
                                 </td>
 
@@ -252,9 +252,9 @@
             rows.forEach(row => {
                 const name = row.querySelector('.student-name')?.textContent.toLowerCase() || '';
                 const email = row.querySelector('.student-email')?.textContent.toLowerCase() || '';
-                const college = row.querySelector('.student-college')?.textContent.toLowerCase() || '';
+                const program = row.querySelector('.student-program')?.textContent.toLowerCase() || '';
 
-                if (name.includes(query) || email.includes(query) || college.includes(query)) {
+                if (name.includes(query) || email.includes(query) || program.includes(query)) {
                     row.style.display = '';
                 } else {
                     row.style.display = 'none';

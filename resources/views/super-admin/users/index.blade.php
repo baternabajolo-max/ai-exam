@@ -18,18 +18,6 @@
             </button>
         </div>
 
-        @if (session('success'))
-            <div class="alert alert-success" role="status">{{ session('success') }}</div>
-        @endif
-        @if (session('error') || session('invitation_error'))
-            <div class="alert alert-danger" role="alert">{{ session('error') ?? session('invitation_error') }}</div>
-        @endif
-        @if ($errors->any())
-            <div class="alert alert-danger" role="alert">
-                <ul class="mb-0">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
-            </div>
-        @endif
-
         <section class="directory-card overflow-hidden">
             <div class="d-flex align-items-center justify-content-between border-bottom p-4">
                 <div>
@@ -93,7 +81,7 @@
                                             </form>
                                         @endif
                                         <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editAdminModal{{ $admin->id }}">
-                                            <i class="bi bi-pencil me-1"></i>Assign
+                                            <i class="bi bi-pencil me-1"></i>Edit
                                         </button>
                                         <form
                                             action="{{ route('super-admin.users.destroy', $admin) }}"
@@ -165,7 +153,7 @@
                 <div class="modal-header">
                     <div>
                         <h2 class="modal-title h5 fw-bold" id="createAdminModalLabel">Add Faculty</h2>
-                        <small class="text-muted">Faculty can work across programs within the assigned college.</small>
+                        <small class="text-muted">Faculty can access all programs within the assigned college.</small>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>

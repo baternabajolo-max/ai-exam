@@ -10,7 +10,9 @@
                 <span class="dashboard-eyebrow">Institution overview</span>
                 <h1 class="dashboard-title mb-1">System analytics</h1>
                 <p class="dashboard-subtitle mb-0">
-                    @if($selectedDepartment)
+                    @if($selectedCourse)
+                        Viewing engagement, assessment outcomes, and enrollment trends for {{ $selectedCourse->name }}.
+                    @elseif($selectedDepartment)
                         Viewing engagement, assessment outcomes, and enrollment trends for {{ $selectedDepartment->name }}.
                     @else
                         Compare college engagement and general-test outcomes, and follow enrollment trends.
@@ -34,6 +36,23 @@
                         @endforeach
                     </select>
                 </form>
+                <form method="GET" action="{{ route('super-admin.dashboard') }}" class="d-flex align-items-center gap-2">
+                    <input type="hidden" name="college_id" value="{{ $selectedDepartmentId ?? '' }}">
+                    <input type="hidden" name="period" value="{{ $period }}">
+                    @if ($period === 'custom')
+                        <input type="hidden" name="start_date" value="{{ $periodStartDate }}">
+                        <input type="hidden" name="end_date" value="{{ $periodEndDate }}">
+                    @endif
+                    <label for="super-admin-program-filter" class="visually-hidden">View dashboard for a specific program</label>
+                    <select id="super-admin-program-filter" name="course_id" class="form-select border rounded-3 shadow-sm" aria-label="View dashboard for a specific program">
+                        <option value="">All Programs</option>
+                        @foreach($courses as $course)
+                            <option value="{{ $course->id }}" @selected((string) old('course_id', $selectedCourseId ?? '') === (string) $course->id)>
+                                {{ $course->name }} · {{ $course->department->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </form>
                 <div class="dropdown analytics-period-picker">
                     <button
                         class="btn btn-white border rounded-3 shadow-sm d-flex align-items-center gap-3 px-3 py-2 text-start analytics-period-trigger"
@@ -53,6 +72,7 @@
                     <div class="dropdown-menu dropdown-menu-end analytics-period-menu p-3" aria-labelledby="super-admin-analytics-period-toggle">
                         <form method="GET" action="{{ route('super-admin.dashboard') }}" id="super-admin-analytics-filter">
                             <input type="hidden" name="college_id" value="{{ $selectedDepartmentId ?? '' }}">
+                            <input type="hidden" name="course_id" value="{{ $selectedCourseId ?? '' }}">
                             <label for="super-admin-analytics-period" class="form-label small fw-semibold text-secondary">Reporting period</label>
                             <select id="super-admin-analytics-period" name="period" class="form-select form-select-sm analytics-filter mb-3">
                                 @foreach([7 => 'Last 7 days', 30 => 'Last 30 days', 90 => 'Last 90 days'] as $days => $label)
@@ -93,7 +113,9 @@
                         <h2 class="h5 mb-1">Student search results</h2>
                         <p class="text-secondary small mb-0">
                             Matches for “{{ $studentSearch }}”
-                            @if($selectedDepartment) in {{ $selectedDepartment->name }} @else across all colleges @endif
+                            @if($selectedCourse) in {{ $selectedCourse->name }}
+                            @elseif($selectedDepartment) in {{ $selectedDepartment->name }}
+                            @else across all colleges @endif
                         </p>
                     </div>
                     <span class="badge rounded-pill bg-light text-secondary border">{{ $matchingStudents->count() }} matches</span>
@@ -104,6 +126,7 @@
                            href="{{ route('super-admin.students.show', [
                                'student' => $student,
                                'college_id' => $selectedDepartmentId,
+                               'course_id' => $selectedCourseId,
                                'student_search' => $studentSearch,
                            ]) }}">
                             <span class="min-w-0">
@@ -124,9 +147,9 @@
             <div class="col">
                 <article class="system-kpi h-100">
                     <span class="system-kpi-icon"><i class="bi bi-buildings" aria-hidden="true"></i></span>
-                    <span class="system-kpi-label">Colleges</span>
+                    <span class="system-kpi-label">{{ $selectedCourse ? 'Programs' : 'Colleges' }}</span>
                     <strong class="system-kpi-value">{{ $totalDepartments }}</strong>
-                    <span class="system-kpi-note">{{ $selectedDepartment ? 'Selected college' : 'Configured in the system' }}</span>
+                    <span class="system-kpi-note">{{ $selectedCourse ? 'Selected program' : ($selectedDepartment ? 'Selected college' : 'Configured in the system') }}</span>
                 </article>
             </div>
             <div class="col">
@@ -134,7 +157,7 @@
                     <span class="system-kpi-icon"><i class="bi bi-person-badge" aria-hidden="true"></i></span>
                     <span class="system-kpi-label">Faculty</span>
                     <strong class="system-kpi-value">{{ $totalAdmins }}</strong>
-                    <span class="system-kpi-note">{{ $selectedDepartment ? 'In '.$selectedDepartment->name : 'Across all colleges' }}</span>
+                    <span class="system-kpi-note">{{ $selectedCourse ? 'Associated with '.$selectedCourse->name : ($selectedDepartment ? 'In '.$selectedDepartment->name : 'Across all colleges') }}</span>
                 </article>
             </div>
             <div class="col">
@@ -142,7 +165,7 @@
                     <span class="system-kpi-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
                     <span class="system-kpi-label">Students</span>
                     <strong class="system-kpi-value">{{ $totalStudents }}</strong>
-                    <span class="system-kpi-note">{{ $selectedDepartment ? 'Registered in '.$selectedDepartment->name : 'All registered student accounts' }}</span>
+                    <span class="system-kpi-note">{{ $selectedCourse ? 'Registered in '.$selectedCourse->name : ($selectedDepartment ? 'Registered in '.$selectedDepartment->name : 'All registered student accounts') }}</span>
                 </article>
             </div>
             <div class="col">
@@ -150,7 +173,7 @@
                     <span class="system-kpi-icon is-green"><i class="bi bi-activity" aria-hidden="true"></i></span>
                     <span class="system-kpi-label">Active participation</span>
                     <strong class="system-kpi-value">{{ $activeParticipationRate === null ? '—' : $activeParticipationRate.'%' }}</strong>
-                    <span class="system-kpi-note">{{ $activeStudentCount }} / {{ $departmentStudentTotal }} {{ $selectedDepartment ? 'students' : 'college students' }} · last {{ $periodDays }} days</span>
+                    <span class="system-kpi-note">{{ $activeStudentCount }} / {{ $departmentStudentTotal }} {{ $selectedCourse ? 'program students' : ($selectedDepartment ? 'students' : 'college students') }} · last {{ $periodDays }} days</span>
                 </article>
             </div>
         </section>
@@ -159,22 +182,22 @@
             <span class="small text-secondary">Active = at least one reading session or assessment</span>
         </div>
 
-        <section class="row g-4 mb-4" aria-label="Enrollment and college performance charts">
+        <section class="row g-4 mb-4" aria-label="Enrollment and program performance charts">
             <div class="col-xl-6">
                 <article class="analytics-panel h-100">
                     <header class="analytics-panel-header">
                         <div>
                             <h2 class="h5 fw-bold mb-1">Monthly student registrations</h2>
                             <p class="small text-secondary mb-0">
-                                New student accounts {{ $selectedDepartment ? 'in '.$selectedDepartment->name : 'by college' }} · last 12 months
+                                New student accounts {{ $selectedCourse ? 'in '.$selectedCourse->name : ($selectedDepartment ? 'in '.$selectedDepartment->name : 'by college') }} · last 12 months
                             </p>
                         </div>
                     </header>
                     <div class="system-chart-wrapper">
-                        <canvas id="departmentStudentChart" role="img" aria-label="Monthly new student registrations by college over the last 12 months"></canvas>
+                        <canvas id="departmentStudentChart" role="img" aria-label="Monthly new student registrations by program over the last 12 months"></canvas>
                     </div>
                     <p class="visually-hidden">
-                        Registration trend chart. Data is grouped by calendar month and year, and college colors use their configured theme.
+                        Registration trend chart. Data is grouped by calendar month and year.
                     </p>
                 </article>
             </div>
@@ -182,20 +205,20 @@
                 <article class="analytics-panel h-100">
                     <header class="analytics-panel-header">
                         <div>
-                            <h2 class="h5 fw-bold mb-1">{{ $selectedDepartment ? 'General-test score · '.$selectedDepartment->name : 'General-test score by college' }}</h2>
+                            <h2 class="h5 fw-bold mb-1">{{ $selectedCourse ? 'General-test score · '.$selectedCourse->name : ($selectedDepartment ? 'General-test score · '.$selectedDepartment->name : 'General-test score by college') }}</h2>
                             <p class="small text-secondary mb-0">Average latest student score · dashed line marks the 75% target</p>
                         </div>
                     </header>
                     @if($departmentAnalytics->isEmpty())
-                        <div class="analytics-empty">No colleges are available to compare yet.</div>
+                        <div class="analytics-empty">No programs or colleges are available to compare yet.</div>
                     @elseif($departmentAnalytics->every(fn (array $department): bool => $department['average_score'] === null))
                         <div class="analytics-empty">No general-test attempts in the selected period.</div>
                     @else
                         <div class="system-chart-wrapper">
-                            <canvas id="departmentPerformanceChart" role="img" aria-label="Average general-test score comparison by college for the last {{ $periodDays }} days" aria-describedby="department-summary-title"></canvas>
+                            <canvas id="departmentPerformanceChart" role="img" aria-label="Average general-test score comparison by program for the last {{ $periodDays }} days" aria-describedby="department-summary-title"></canvas>
                         </div>
                     @endif
-                    <p class="visually-hidden">Hover or focus on a bar to see student counts, pass rate, and active participation for that college.</p>
+                    <p class="visually-hidden">Hover or focus on a bar to see student counts, pass rate, and active participation for that program.</p>
                 </article>
             </div>
         </section>
@@ -203,8 +226,8 @@
         <section class="analytics-panel" aria-labelledby="department-summary-title">
             <header class="analytics-panel-header">
                 <div>
-                    <h2 id="department-summary-title" class="h5 fw-bold mb-1">College performance and participation</h2>
-                    <p class="small text-secondary mb-0">Use the sample counts to compare outcomes fairly across college sizes.</p>
+                    <h2 id="department-summary-title" class="h5 fw-bold mb-1">{{ $selectedCourse ? 'Program performance and participation' : 'College performance and participation' }}</h2>
+                    <p class="small text-secondary mb-0">Use the sample counts to compare outcomes fairly across cohort sizes.</p>
                 </div>
                 <span class="period-chip">{{ $periodLabel }}</span>
             </header>
@@ -212,7 +235,7 @@
                 <table class="table align-middle mb-0 department-summary-table">
                     <thead>
                         <tr>
-                            <th scope="col">College</th>
+                            <th scope="col">{{ $selectedCourse ? 'Program' : 'College' }}</th>
                             <th scope="col">Active students</th>
                             <th scope="col">Test participants</th>
                             <th scope="col">Average score</th>
@@ -234,7 +257,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="text-center text-secondary py-4">No colleges have been created yet.</td>
+                                <td colspan="5" class="text-center text-secondary py-4">No programs or colleges have been created yet.</td>
                             </tr>
                         @endforelse
                     </tbody>

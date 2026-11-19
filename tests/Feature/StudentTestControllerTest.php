@@ -7,6 +7,7 @@ use App\Models\Department;
 use App\Models\Question;
 use App\Models\QuestionBankItem;
 use App\Models\Test as Exam;
+use App\Models\TestRetakeGrant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
@@ -59,7 +60,6 @@ class StudentTestControllerTest extends TestCase
             'course_id' => $otherCourse->id,
         ]);
         $exam = $this->createExam($department->id, $course->id, '2026-03-20 11:00:00', '2026-03-20 12:00:00');
-
         $this->actingAs($student)
             ->get(route('student.tests.show', $exam))
             ->assertNotFound();
@@ -131,6 +131,8 @@ class StudentTestControllerTest extends TestCase
             ->assertSee('01:00:00')
             ->assertSee('position: sticky', false)
             ->assertSee("addEventListener('pagehide'", false)
+            ->assertSee("addEventListener('visibilitychange'", false)
+            ->assertSee('Switching tabs, closing the tab, or leaving this page submits your current answers automatically.')
             ->assertSee('navigator.sendBeacon(form.action, submission)', false)
             ->assertDontSee('Exit Quiz');
 
@@ -167,6 +169,12 @@ class StudentTestControllerTest extends TestCase
         $this->get(route('student.results.show', $result))
             ->assertSee('Return to Examination')
             ->assertSee('href="'.route('student.exams.index').'"', false)
+            ->assertSee('data-close-exam-tab', false)
+            ->assertSee("new BroadcastChannel('lemu-exam-updates')", false)
+            ->assertSee("type: 'exam-submitted'", false)
+            ->assertSee('window.opener.location.reload();', false)
+            ->assertSee('window.close();', false)
+            ->assertSee('window.location.assign(returnLink.href);', false)
             ->assertDontSee('href="'.route('student.learn.index').'"', false);
 
         $this->travelTo('2026-03-20 12:01:00');
@@ -180,6 +188,83 @@ class StudentTestControllerTest extends TestCase
             ->assertSee('Completed')
             ->assertSee('View results')
             ->assertDontSee('Open examination');
+    }
+
+    public function test_student_can_take_one_activated_retake_with_a_persistent_fresh_timer(): void
+    {
+        $this->travelTo('2026-03-20 11:30:00');
+        [$department, $course] = $this->createProgram();
+        $faculty = User::factory()->create([
+            'role' => 'admin',
+            'department_id' => $department->id,
+        ]);
+        $student = User::factory()->create([
+            'role' => 'student',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $exam = $this->createExam($department->id, $course->id, '2026-03-20 11:00:00', '2026-03-20 12:00:00');
+        $exam->update(['time_limit' => 60]);
+        $question = $exam->questions()->firstOrFail();
+
+        $this->actingAs($student)
+            ->post(route('student.tests.submit', $exam), [
+                'answers' => [$question->id => 'A'],
+                'question_order' => [$question->id],
+            ])
+            ->assertRedirect();
+        $firstResult = $student->results()->where('test_id', $exam->id)->firstOrFail();
+
+        $this->actingAs($faculty)
+            ->post(route('admin.students.tests.retake', ['student' => $student, 'test' => $exam]))
+            ->assertRedirect();
+
+        $this->actingAs($student)
+            ->get(route('student.exams.index'))
+            ->assertSee('Retake available')
+            ->assertSee('Take retake')
+            ->assertSee('View results');
+
+        $this->post(route('student.exams.start', $exam))
+            ->assertRedirect(route('student.tests.show', $exam));
+        $grant = TestRetakeGrant::query()
+            ->where('test_id', $exam->id)
+            ->where('student_id', $student->id)
+            ->firstOrFail();
+        $this->assertSame(now()->timestamp, $grant->started_at->timestamp);
+
+        $this->get(route('student.tests.show', $exam))
+            ->assertSee('data-remaining-seconds="3600"', false);
+        $this->travel(10)->seconds();
+        $this->get(route('student.tests.show', $exam))
+            ->assertSee('data-remaining-seconds="3590"', false);
+
+        $this->post(route('student.tests.submit', $exam), [
+            'answers' => [$question->id => 'B'],
+            'question_order' => [$question->id],
+        ])->assertRedirect();
+
+        $latestResult = $student->results()
+            ->where('test_id', $exam->id)
+            ->latest('id')
+            ->firstOrFail();
+        $this->assertNotSame($firstResult->id, $latestResult->id);
+        $this->assertDatabaseCount('results', 2);
+        $this->assertDatabaseHas('test_retake_grants', [
+            'test_id' => $exam->id,
+            'student_id' => $student->id,
+        ]);
+        $this->assertNotNull($grant->fresh()->consumed_at);
+
+        $this->get(route('student.tests.show', $exam))
+            ->assertRedirect(route('student.results.show', $latestResult));
+        $this->getJson(route('student.tests.build', $exam))
+            ->assertStatus(409)
+            ->assertJsonPath('status', 'already_completed')
+            ->assertJsonPath('result_url', route('student.results.show', $latestResult));
+        $this->get(route('student.exams.index'))
+            ->assertSee('View results')
+            ->assertDontSee('Take retake');
     }
 
     public function test_scheduled_exam_submission_after_the_countdown_expires_is_saved_as_unanswered(): void
@@ -209,6 +294,9 @@ class StudentTestControllerTest extends TestCase
         $this->assertSame(0, $result->score);
         $this->assertNull($result->answers[0]['user_answer']);
         $this->assertFalse($result->answers[0]['is_correct']);
+        $this->assertSame('time_expired', $result->submission_type);
+        $this->assertSame(60, $result->time_taken_seconds);
+        $this->assertSame(now()->subSeconds(61)->timestamp, $result->started_at->timestamp);
     }
 
     public function test_student_exam_list_displays_status_and_only_assigned_program_exams(): void
@@ -252,6 +340,8 @@ class StudentTestControllerTest extends TestCase
             '2026-03-20 18:10:00',
             'Local time examination',
         );
+        $question = $exam->questions()->firstOrFail();
+        $question->update(['image_path' => 'question-bank-images/exam-equation.png']);
 
         $this->actingAs($student)
             ->get(route('student.exams.index'))
@@ -261,7 +351,8 @@ class StudentTestControllerTest extends TestCase
 
         $this->get(route('student.tests.show', $exam))
             ->assertOk()
-            ->assertSee('Scheduled Network Question');
+            ->assertSee('Scheduled Network Question')
+            ->assertSee('src="'.asset('storage/'.$question->image_path).'"', false);
     }
 
     public function test_student_must_confirm_before_taking_an_active_exam(): void
@@ -282,6 +373,9 @@ class StudentTestControllerTest extends TestCase
             ->assertSee('data-bs-toggle="modal"', false)
             ->assertSee('data-bs-target="#takeExamConfirmation"', false)
             ->assertSee('data-exam-start-url="'.route('student.exams.start', $exam).'"', false)
+            ->assertSee('id="startExamForm"', false)
+            ->assertSee('target="_blank"', false)
+            ->assertSee('bootstrap.Modal.getOrCreateInstance(confirmationModal).hide();', false)
             ->assertSee('id="takeExamConfirmation"', false)
             ->assertSee('only once')
             ->assertSee('will not be submitted until you finish')

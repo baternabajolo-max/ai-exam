@@ -5,6 +5,7 @@
 
 @section('content')
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
 <!-- Link to External CSS -->
 <link rel="stylesheet" href="{{ asset('css/student/learn/review.css') }}">
 
@@ -138,6 +139,37 @@
     .pdf-text-content::selection {
         background: #bae6fd;
         color: #0369a1;
+    }
+
+    .math-processing-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1.25rem;
+        border: 1px solid #bae6fd;
+        border-radius: 0.875rem;
+        background: #f0f9ff;
+        color: #0c4a6e;
+    }
+
+    .math-processing-spinner {
+        width: 1.5rem;
+        height: 1.5rem;
+        flex: 0 0 auto;
+        border: 3px solid #bae6fd;
+        border-top-color: #0284c7;
+        border-radius: 50%;
+        animation: mathProcessingSpin 0.8s linear infinite;
+    }
+
+    @keyframes mathProcessingSpin {
+        to { transform: rotate(360deg); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .math-processing-spinner {
+            animation-duration: 2s;
+        }
     }
 
     /* Controls */
@@ -402,13 +434,18 @@
                         @if(in_array($subtopic->text_extraction_status, ['pending', 'processing'], true))
                             <div
                                 id="reviewer-extraction-status"
-                                class="alert alert-info rounded-3"
+                                class="math-processing-card"
                                 role="status"
                                 aria-live="polite"
                                 data-status-url="{{ route('student.learn.subtopic.extraction-status', $subtopic) }}"
                             >
-                                <strong data-reviewer-extraction-message>Preparing the interactive text reader...</strong>
-                                <p class="small mb-0 mt-2">The extracted reviewer text will appear here as soon as it is ready.</p>
+                                <span class="math-processing-spinner" aria-hidden="true"></span>
+                                <div>
+                                    <strong class="d-block mb-1" data-reviewer-extraction-message>
+                                        {{ $subtopic->text_extraction_status === 'processing' ? 'Processing math equations...' : 'Queued for math processing...' }}
+                                    </strong>
+                                    <p class="small mb-0">Your reviewer is being converted into readable text and LaTeX. This page will update automatically when processing is complete.</p>
+                                </div>
                             </div>
                         @elseif($subtopic->text_extraction_status === 'failed')
                             <div id="reviewer-extraction-status" class="alert alert-warning rounded-3" role="status">
@@ -761,6 +798,8 @@
     const explainApiUrl = "{{ route('student.learn.explain') }}";
 </script>
 
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"></script>
 <script src="{{ asset('js/student/learn/review.js') }}"></script>
 
 <script>
@@ -771,6 +810,48 @@
         const tooltip = document.getElementById('highlight-tooltip');
         const documentBody = document.getElementById('documentBody');
         let currentSelectedText = '';
+
+        if (documentBody && typeof renderMathInElement === 'function') {
+            const renderReviewerMath = function () {
+                renderMathInElement(documentBody, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '$', right: '$', display: false },
+                        { left: '\\[', right: '\\]', display: true },
+                        { left: '\\(', right: '\\)', display: false },
+                    ],
+                    throwOnError: false,
+                });
+            };
+
+            renderReviewerMath();
+
+            const mathObserver = new MutationObserver(function (mutations) {
+                const hasUnrenderedContent = mutations.some(function (mutation) {
+                    if (mutation.type === 'characterData') {
+                        return !mutation.target.parentElement?.closest('.katex');
+                    }
+
+                    return Array.from(mutation.addedNodes).some(function (node) {
+                        const element = node.nodeType === Node.ELEMENT_NODE
+                            ? node
+                            : node.parentElement;
+
+                        return element && !element.closest('.katex');
+                    });
+                });
+
+                if (hasUnrenderedContent) {
+                    window.requestAnimationFrame(renderReviewerMath);
+                }
+            });
+
+            mathObserver.observe(documentBody, {
+                childList: true,
+                characterData: true,
+                subtree: true,
+            });
+        }
 
         function handleSelection() {
             const selection = window.getSelection();
@@ -1060,15 +1141,9 @@
         const extractionStatus = document.getElementById('reviewer-extraction-status');
         if (extractionStatus && extractionStatus.dataset.statusUrl) {
             const extractionMessage = extractionStatus.querySelector('[data-reviewer-extraction-message]');
-            let statusChecks = 0;
+            const pollInterval = 5000;
 
             const checkExtractionStatus = async function () {
-                statusChecks++;
-                if (statusChecks > 30) {
-                    extractionMessage.textContent = 'Extraction is taking longer than expected. You can return to this page later.';
-                    return;
-                }
-
                 try {
                     const response = await fetch(extractionStatus.dataset.statusUrl, {
                         credentials: 'same-origin',
@@ -1085,19 +1160,24 @@
                         return;
                     }
                     if (data.status === 'failed') {
-                        extractionStatus.classList.replace('alert-info', 'alert-danger');
+                        extractionStatus.classList.remove('math-processing-card');
+                        extractionStatus.classList.add('alert', 'alert-warning', 'rounded-3');
                         extractionMessage.textContent = 'The reviewer text could not be prepared. Please contact your faculty member.';
+                        extractionStatus.querySelector('.math-processing-spinner')?.remove();
                         return;
                     }
 
-                    extractionMessage.textContent = 'Preparing the interactive text reader...';
-                    window.setTimeout(checkExtractionStatus, 10000);
+                    extractionMessage.textContent = data.status === 'processing'
+                        ? 'Processing math equations...'
+                        : 'Queued for math processing...';
+                    window.setTimeout(checkExtractionStatus, pollInterval);
                 } catch (error) {
-                    extractionMessage.textContent = `${error.message} Please refresh this page later.`;
+                    extractionMessage.textContent = 'Still waiting for the math processor. Checking again shortly...';
+                    window.setTimeout(checkExtractionStatus, pollInterval * 2);
                 }
             };
 
-            window.setTimeout(checkExtractionStatus, 10000);
+            window.setTimeout(checkExtractionStatus, pollInterval);
         }
 
         const tracker = document.getElementById('study-time-tracker');

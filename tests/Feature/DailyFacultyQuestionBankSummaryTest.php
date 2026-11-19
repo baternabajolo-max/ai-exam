@@ -48,18 +48,44 @@ class DailyFacultyQuestionBankSummaryTest extends TestCase
             ->get(route('super-admin.dashboard'))
             ->assertSee('Daily Question Bank Summary')
             ->assertSee('2 question(s) added')
-            ->assertSee('Faculty A: 2')
-            ->assertSee('admin-notification-trigger')
+            ->assertSee('role-sidebar-navbar', false)
+            ->assertSee('Examinations')
+            ->assertSee('Analysis')
+            ->assertSee(route('super-admin.item-analysis.index'), false)
+            ->assertSee('sidebar-account-links', false)
+            ->assertSee(route('super-admin.profile'), false)
+            ->assertSee('data-bs-target="#themeSettingsModal"', false)
+            ->assertSee('Logout')
+            ->assertSee('Signed in as '.$admin->name)
+            ->assertSee('notification-modal-trigger')
+            ->assertSee('notification-dropdown__list')
             ->assertSee(route('super-admin.notifications.read', $notification->id), false)
-            ->assertSee('window.location.assign(trigger.href)', false);
+            ->assertSee('data-bs-target="#notificationModal"', false);
 
         $this->actingAs($secondAdmin)
             ->post(route('super-admin.notifications.read', $notification->id))
             ->assertNotFound();
 
+        $returnTo = '/super-admin/monitoring';
         $this->actingAs($admin)
-            ->post(route('super-admin.notifications.read', $notification->id))
-            ->assertRedirect();
+            ->get(route('super-admin.notifications.index', [
+                'notification' => $notification->id,
+                'return_to' => $returnTo,
+            ]))
+            ->assertSee('Faculty breakdown')
+            ->assertSee('Faculty A')
+            ->assertSee('2 questions')
+            ->assertSee('notifications-page__sidebar', false)
+            ->assertSee('notifications-page__reader', false)
+            ->assertSee('notifications-page__reader-actions', false)
+            ->assertSee('Delete')
+            ->assertSee('Close notification');
+        $this->assertNull($notification->fresh()->read_at);
+
+        $this->post(route('super-admin.notifications.read', $notification->id), [
+            'leave_page' => 1,
+            'return_to' => $returnTo,
+        ])->assertRedirect($returnTo);
         $this->assertNotNull($admin->notifications()->whereKey($notification->id)->firstOrFail()->read_at);
     }
 

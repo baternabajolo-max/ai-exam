@@ -102,14 +102,17 @@ class CollegeManagementTest extends TestCase
         ]);
     }
 
-    public function test_super_admin_leaderboard_uses_college_terminology(): void
+    public function test_super_admin_results_route_uses_college_terminology(): void
     {
         Department::create(['name' => 'College of Computing', 'code' => 'COC']);
 
-        $this->actingAs(User::factory()->create(['role' => 'super-admin']))
+        $superAdmin = User::factory()->create(['role' => 'super-admin']);
+        $this->actingAs($superAdmin)
             ->get(route('super-admin.leaderboard'))
-            ->assertSee('College leaderboard')
-            ->assertSee('View the top students across a selected college.')
+            ->assertRedirect(route('super-admin.results.index'));
+
+        $this->get(route('super-admin.results.index'))
+            ->assertSee('Results')
             ->assertSee('College')
             ->assertSee('College of Computing');
     }

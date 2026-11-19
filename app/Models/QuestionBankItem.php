@@ -15,6 +15,7 @@ class QuestionBankItem extends Model
 
     protected $fillable = [
         'course_id',
+        'topic_id',
         'author_id',
         'subtopic_id',
         'question',
@@ -22,18 +23,27 @@ class QuestionBankItem extends Model
         'correct_answer',
         'explanation',
         'topic',
+        'image_path',
+        'difficulty',
+        'is_active',
     ];
 
     protected function casts(): array
     {
         return [
             'options' => 'array',
+            'is_active' => 'boolean',
         ];
     }
 
     public function course(): BelongsTo
     {
         return $this->belongsTo(Course::class);
+    }
+
+    public function topicRecord(): BelongsTo
+    {
+        return $this->belongsTo(Topic::class, 'topic_id');
     }
 
     public function author(): BelongsTo

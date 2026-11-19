@@ -552,6 +552,9 @@
                                 {{ $cleanQuestion }}
                             </h2>
                         </div>
+                        @if ($question->image_path)
+                            <img src="{{ asset('storage/'.$question->image_path) }}" alt="Question illustration" class="img-fluid rounded border mb-4 ms-5" style="max-height: 24rem; object-fit: contain; object-position: left;">
+                        @endif
 
                         <div class="row g-3">
                             @php

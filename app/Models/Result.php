@@ -18,11 +18,16 @@ class Result extends Model
         'passed',
         'answers_summary', // The AI can keep using this one
         'answers',         // We will use this one for the review!
+        'started_at',
+        'time_taken_seconds',
+        'submission_type',
     ];
 
     protected $casts = [
         'answers_summary' => 'array',
         'answers' => 'array', // Automatically handles JSON
+        'passed' => 'boolean',
+        'started_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

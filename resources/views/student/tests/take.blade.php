@@ -240,6 +240,16 @@
         </div>
     </header>
 
+    @if($test->is_scheduled_exam)
+        <div class="alert alert-warning d-flex align-items-start gap-2" role="alert">
+            <i class="bi bi-exclamation-triangle-fill mt-1" aria-hidden="true"></i>
+            <div>
+                <strong>Stay on this exam page.</strong>
+                Switching tabs, closing the tab, or leaving this page submits your current answers automatically.
+            </div>
+        </div>
+    @endif
+
     {{-- ========================================================================= --}}
     {{-- 3. TEST FORM & QUESTION BATCH CONTAINER                                   --}}
     {{-- ========================================================================= --}}
@@ -296,6 +306,9 @@
                                             {{ $cleanQuestion }}
                                         </h2>
                                     </div>
+                                    @if ($question->image_path)
+                                        <img src="{{ asset('storage/'.$question->image_path) }}" alt="Question illustration" class="img-fluid rounded border mb-4 ms-5" style="max-height: 24rem; object-fit: contain; object-position: left;">
+                                    @endif
 
                                     @if($questionType === \App\Models\Test::QUESTION_TYPE_IDENTIFICATION)
                                         <div class="col-12">
@@ -383,6 +396,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const testGenerationError = document.getElementById('test-generation-error');
     const testGenerationErrorMessage = document.getElementById('test-generation-error-message');
     const examCountdown = document.getElementById('exam-countdown');
+    const isScheduledExam = @json($test->is_scheduled_exam);
     let countdownInterval = null;
     let examSubmissionStarted = false;
 
@@ -428,16 +442,21 @@ document.addEventListener('DOMContentLoaded', function() {
         if (remainingSeconds > 0) {
             countdownInterval = window.setInterval(updateCountdown, 1000);
         }
+    }
 
-        window.addEventListener('pagehide', function () {
+    if (isScheduledExam) {
+        function submitExamOnLeave() {
             const form = document.getElementById('test-form');
-            if (examSubmissionStarted || !form || !navigator.sendBeacon) {
+            if (examSubmissionStarted || !form) {
                 return;
             }
 
             examSubmissionStarted = true;
+            if (countdownInterval !== null) {
+                window.clearInterval(countdownInterval);
+            }
             const submission = new FormData(form);
-            if (!navigator.sendBeacon(form.action, submission)) {
+            if (!navigator.sendBeacon || !navigator.sendBeacon(form.action, submission)) {
                 fetch(form.action, {
                     method: 'POST',
                     body: submission,
@@ -447,7 +466,37 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error('Could not submit the examination while leaving the page.', error);
                 });
             }
+        }
+
+        let submittedAfterTabSwitch = false;
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'hidden') {
+                if (!examSubmissionStarted) {
+                    submittedAfterTabSwitch = true;
+                    submitExamOnLeave();
+                }
+
+                return;
+            }
+
+            if (submittedAfterTabSwitch) {
+                const form = document.getElementById('test-form');
+                if (!form) {
+                    return;
+                }
+
+                submittedAfterTabSwitch = false;
+                if (countdownInterval !== null) {
+                    window.clearInterval(countdownInterval);
+                }
+                testStatusTitle.textContent = 'Your exam was submitted';
+                testStatusMessage.textContent = 'You left the exam page, so your current answers have been submitted.';
+                testStatusOverlay.classList.replace('d-none', 'd-flex');
+                HTMLFormElement.prototype.submit.call(form);
+            }
         });
+
+        window.addEventListener('pagehide', submitExamOnLeave);
     }
 
     function showTestGenerationError(message) {

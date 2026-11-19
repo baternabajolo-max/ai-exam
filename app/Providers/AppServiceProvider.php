@@ -23,7 +23,7 @@ class AppServiceProvider extends ServiceProvider
         View::composer('layouts.app', function ($view): void {
             $user = auth()->user();
 
-            if ($user?->role === 'super-admin') {
+            if (in_array($user?->role, ['admin', 'super-admin'], true)) {
                 $view->with([
                     'adminNavNotifications' => $user->notifications()->latest()->take(5)->get(),
                     'unreadAdminNotificationCount' => $user->unreadNotifications()->count(),
