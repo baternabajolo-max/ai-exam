@@ -35,11 +35,20 @@
     .exam-list__table {
         --bs-table-bg: #fff;
         --bs-table-color: #1e293b;
-        min-width: 900px;
+        min-width: 760px;
     }
 
     .exam-list__table tbody tr {
         transition: background-color .18s ease;
+    }
+
+    .exam-list__row {
+        cursor: pointer;
+    }
+
+    .exam-list__row:focus-within {
+        outline: 2px solid #a5b4fc;
+        outline-offset: -2px;
     }
 
     .exam-list__table tbody tr:hover {
@@ -61,6 +70,218 @@
     .exam-list__table tbody td {
         border-color: #eef2f7;
         padding: 1rem;
+    }
+
+    .exam-list__title {
+        font-size: .95rem;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+
+    .exam-list__details-trigger {
+        align-items: flex-start;
+        background: transparent;
+        border: 0;
+        color: inherit;
+        display: flex;
+        font: inherit;
+        gap: .75rem;
+        justify-content: space-between;
+        padding: 0;
+        text-align: left;
+        width: 100%;
+    }
+
+    .exam-list__details-trigger:focus-visible {
+        border-radius: .35rem;
+        outline: 3px solid rgb(99 102 241 / 35%);
+        outline-offset: 3px;
+    }
+
+    .exam-list__details-trigger .bi-chevron-right {
+        color: #94a3b8;
+        flex: 0 0 auto;
+        margin-top: .15rem;
+        transition: color .18s ease, transform .18s ease;
+    }
+
+    .exam-list__row:hover .exam-list__details-trigger .bi-chevron-right {
+        color: #4338ca;
+        transform: translateX(2px);
+    }
+
+    .exam-list__topic {
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        border-radius: 999px;
+        color: #475569;
+        display: inline-flex;
+        font-size: .75rem;
+        margin-top: .35rem;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+        padding: .15rem .55rem;
+    }
+
+    .exam-list__details-grid {
+        display: grid;
+        gap: .75rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .exam-list__details-header {
+        min-width: 0;
+    }
+
+    .exam-list__detail-item {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: .85rem;
+        min-width: 0;
+        padding: .85rem 1rem;
+    }
+
+    .exam-list__detail-item--wide {
+        grid-column: 1 / -1;
+    }
+
+    .exam-list__detail-label {
+        color: #64748b;
+        display: block;
+        font-size: .72rem;
+        font-weight: 700;
+        letter-spacing: .04em;
+        margin-bottom: .3rem;
+        text-transform: uppercase;
+    }
+
+    .exam-list__detail-value {
+        display: block;
+        font-size: .9rem;
+        font-weight: 600;
+        overflow-wrap: anywhere;
+    }
+
+    .exam-list__details-modal .modal-header {
+        align-items: flex-start;
+        background: linear-gradient(125deg, #102a56 0%, #2948a3 58%, #5143a8 100%);
+        border: 0;
+        color: #fff;
+        padding: 1.5rem;
+    }
+
+    .exam-list__details-modal .exam-list__eyebrow {
+        color: #c7d2fe;
+    }
+
+    .exam-list__details-modal .modal-title {
+        color: #fff;
+        overflow-wrap: anywhere;
+    }
+
+    .exam-list__details-program {
+        color: rgb(255 255 255 / 78%);
+    }
+
+    .exam-list__details-modal .btn-close {
+        filter: brightness(0) invert(1);
+        opacity: .85;
+    }
+
+    .exam-list__details-modal .modal-body {
+        background: #f8fafc;
+        padding: 1.25rem;
+    }
+
+    .exam-list__details-modal .modal-footer {
+        background: #fff;
+        border-top-color: #e2e8f0;
+        gap: .5rem;
+        padding: 1rem 1.25rem;
+    }
+
+    .exam-list__details-modal .modal-footer .btn {
+        min-height: 2.75rem;
+    }
+
+    .exam-list__details-description {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-left: 4px solid #818cf8;
+        border-radius: .8rem;
+        box-shadow: 0 .25rem .75rem rgb(15 23 42 / 4%);
+        padding: .9rem 1rem;
+    }
+
+    .exam-list__overview-grid {
+        display: grid;
+        gap: .75rem;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .exam-list__overview-stat {
+        align-items: center;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: .9rem;
+        box-shadow: 0 .25rem .75rem rgb(15 23 42 / 4%);
+        display: flex;
+        gap: .75rem;
+        min-width: 0;
+        padding: .9rem;
+    }
+
+    .exam-list__overview-icon {
+        align-items: center;
+        background: #eef2ff;
+        border: 1px solid #c7d2fe;
+        border-radius: .7rem;
+        color: #4338ca;
+        display: inline-flex;
+        flex: 0 0 auto;
+        height: 2.5rem;
+        justify-content: center;
+        width: 2.5rem;
+    }
+
+    .exam-list__overview-label {
+        color: #64748b;
+        display: block;
+        font-size: .7rem;
+        font-weight: 700;
+        letter-spacing: .04em;
+        margin-bottom: .15rem;
+        text-transform: uppercase;
+    }
+
+    .exam-list__overview-value {
+        color: #0f172a;
+        display: block;
+        font-size: .9rem;
+        font-variant-numeric: tabular-nums;
+        font-weight: 700;
+        overflow-wrap: anywhere;
+    }
+
+    .exam-list__details-section-title {
+        font-size: .9rem;
+        font-weight: 700;
+        margin: 0 0 .65rem;
+    }
+
+    .exam-list__table-tools {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: .625rem;
+    }
+
+    .exam-list__table-tools form {
+        width: min(100%, 17rem);
+    }
+
+    .exam-list__table-tools .form-select {
+        min-height: 2.5rem;
     }
 
     .exam-list__availability {
@@ -225,6 +446,35 @@
         }
     }
 
+    @media (max-width: 575.98px) {
+        .exam-list__details-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .exam-list__overview-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .exam-list__detail-item--wide {
+            grid-column: auto;
+        }
+
+        .exam-list__details-modal .modal-header {
+            padding: 1.25rem;
+        }
+
+        .exam-list__details-modal .modal-footer {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .exam-list__delete-form,
+        .exam-list__delete-form .btn,
+        .exam-list__details-modal .modal-footer > .btn {
+            width: 100%;
+        }
+    }
+
     html[data-bs-theme="dark"] .exam-list__table-wrap,
     html[data-bs-theme="dark"] .exam-list__empty,
     html[data-bs-theme="dark"] .exam-review__question {
@@ -255,6 +505,54 @@
 
     html[data-bs-theme="dark"] .exam-list__availability {
         color: #cbd5e1;
+    }
+
+    html[data-bs-theme="dark"] .exam-list__topic {
+        background: #273449;
+        border-color: #475569;
+        color: #cbd5e1;
+    }
+
+    html[data-bs-theme="dark"] .exam-list__detail-item {
+        background: #172033;
+        border-color: #334155;
+    }
+
+    html[data-bs-theme="dark"] .exam-list__detail-label {
+        color: #94a3b8;
+    }
+
+    html[data-bs-theme="dark"] .exam-list__details-modal .modal-body {
+        background: #0f172a;
+    }
+
+    html[data-bs-theme="dark"] .exam-list__details-modal .modal-footer,
+    html[data-bs-theme="dark"] .exam-list__details-description,
+    html[data-bs-theme="dark"] .exam-list__overview-stat {
+        background: #1e293b;
+        border-color: #334155;
+    }
+
+    html[data-bs-theme="dark"] .exam-list__details-description {
+        border-left-color: #818cf8;
+    }
+
+    html[data-bs-theme="dark"] .exam-list__overview-icon {
+        background: #262f57;
+        border-color: #4855a3;
+        color: #c7d2fe;
+    }
+
+    html[data-bs-theme="dark"] .exam-list__overview-label {
+        color: #94a3b8;
+    }
+
+    html[data-bs-theme="dark"] .exam-list__overview-value {
+        color: #f8fafc;
+    }
+
+    html[data-bs-theme="dark"] .exam-list__details-trigger .bi-chevron-right {
+        color: #64748b;
     }
 
     html[data-bs-theme="dark"] .exam-list__metric {
@@ -291,7 +589,8 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-        .exam-list__table tbody tr {
+        .exam-list__table tbody tr,
+        .exam-list__details-trigger .bi-chevron-right {
             transition: none;
         }
     }
@@ -301,10 +600,10 @@
     <header class="exam-list__hero d-flex flex-wrap justify-content-between align-items-center gap-4 mb-4">
         <div>
             <div class="exam-list__eyebrow mb-2">Assessment management</div>
-            <h1 class="h2 fw-bold mb-2">{{ auth()->user()->role === 'super-admin' ? 'Examinations & Analysis' : 'Examinations' }}</h1>
+            <h1 class="h2 fw-bold mb-2">Examinations</h1>
             <p class="text-white-50 mb-0">
                 @if (auth()->user()->role === 'super-admin')
-                    Review Faculty requests, publish assessments, and explore exam results.
+                    Review faculty requests, publish assessments, and track exam outcomes.
                 @else
                     Create examination requests and keep track of their approval and schedule.
                 @endif
@@ -330,7 +629,7 @@
                     Review status, availability, and results at a glance.
                 </p>
             </div>
-            <div class="d-flex align-items-center gap-2">
+            <div class="exam-list__table-tools">
                 @if (auth()->user()->role === 'admin')
                     <form method="GET" action="{{ route('admin.tests.index') }}">
                         <label class="visually-hidden" for="exam-program-filter">Filter examinations by program</label>
@@ -348,7 +647,6 @@
                         <noscript><button class="btn btn-sm btn-outline-primary mt-2" type="submit">Apply filter</button></noscript>
                     </form>
                 @endif
-                <span class="badge rounded-pill text-bg-light border px-3 py-2">{{ $tests->total() }} total</span>
                 @if ($tests->total() > 10)
                     <a
                         class="btn btn-sm btn-outline-primary rounded-pill px-3"
@@ -365,46 +663,30 @@
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0 exam-list__table">
                 <thead class="table-light">
-                    <tr><th scope="col">Examination</th><th scope="col">Program</th><th scope="col">Status</th><th scope="col">Availability</th><th scope="col">Questions</th><th scope="col">Results</th><th scope="col">Created by</th><th scope="col" class="text-end">Actions</th></tr>
+                    <tr><th scope="col">Examination</th><th scope="col">Program</th><th scope="col">Status</th><th scope="col" class="text-end">Actions</th></tr>
                 </thead>
                 <tbody>
                     @forelse ($tests as $test)
                         @php($status = $test->scheduleStatus())
                         @php($canManage = $test->isEditableBy(auth()->user()) && $test->results_count === 0)
-                        <tr>
+                        <tr class="exam-list__row" data-exam-details-target="examDetailsModal{{ $test->id }}">
                             <td data-label="Examination">
-                                <div class="fw-semibold">{{ $test->title }}</div>
-                                <div class="small text-muted">{{ $test->topic }}</div>
-                                @if ($test->approval_status === 'rejected' && (int) $test->created_by === (int) auth()->id() && $test->rejection_comment)
-                                    <div class="small text-danger mt-1">Admin comment: {{ $test->rejection_comment }}</div>
+                                <button
+                                    class="exam-list__details-trigger"
+                                    type="button"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#examDetailsModal{{ $test->id }}"
+                                    aria-label="View details for {{ $test->title }}"
+                                >
+                                    <span class="exam-list__title fw-semibold">{{ $test->title }}</span>
+                                    <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                </button>
+                                @if ($test->topic)
+                                    <span class="exam-list__topic">{{ $test->topic }}</span>
                                 @endif
                             </td>
                             <td data-label="Program">{{ $test->course->name ?? 'Unknown program' }}</td>
                             <td data-label="Status"><span class="badge rounded-pill exam-list__status exam-list__status--{{ strtolower($status) }}">{{ $status }}</span></td>
-                            <td data-label="Availability" class="exam-list__availability">
-                                @if ($test->is_published)
-                                    <div class="small fw-semibold">
-                                        <i class="bi bi-calendar-event me-1 text-primary" aria-hidden="true"></i>
-                                        Opens
-                                        @if ($test->available_from)
-                                            <time datetime="{{ $test->available_from->toIso8601String() }}">{{ $test->available_from->format('M j, Y · g:i A') }}</time>
-                                        @else
-                                            immediately
-                                        @endif
-                                    </div>
-                                    @if ($test->available_until)
-                                        <div class="small text-muted mt-1">
-                                            <i class="bi bi-calendar-x me-1" aria-hidden="true"></i>
-                                            Closes <time datetime="{{ $test->available_until->toIso8601String() }}">{{ $test->available_until->format('M j, Y · g:i A') }}</time>
-                                        </div>
-                                    @endif
-                                @else
-                                    <span class="small text-muted"><i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>Unavailable until approved</span>
-                                @endif
-                            </td>
-                            <td data-label="Questions"><span class="exam-list__metric">{{ $test->questions_count }}</span></td>
-                            <td data-label="Results"><span class="exam-list__metric">{{ $test->results_count }}</span></td>
-                            <td data-label="Created by">{{ $test->creator->name ?? 'Former Faculty' }}</td>
                             <td data-label="Actions" class="text-end exam-list__actions">
                                 <a class="btn btn-sm btn-outline-secondary" href="{{ route($testRoutePrefix.'.tests.print', $test) }}" target="_blank" rel="noopener">
                                     <i class="bi bi-printer me-1" aria-hidden="true"></i>Print
@@ -423,17 +705,10 @@
                                 @elseif (auth()->user()->role === 'admin' && $test->is_published && $test->approval_status === 'approved')
                                     <a class="btn btn-sm btn-outline-primary" href="{{ route('admin.item-analysis.index', ['test_id' => $test->id]) }}"><i class="bi bi-graph-up-arrow me-1" aria-hidden="true"></i>Analyze</a>
                                 @endif
-                                @if ($canManage)
-                                    <form action="{{ route($testRoutePrefix.'.tests.destroy', $test) }}" method="POST" onsubmit="return confirm('Delete this examination?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash3 me-1" aria-hidden="true"></i>Delete</button>
-                                    </form>
-                                @endif
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="8" class="p-3">
+                        <tr><td colspan="4" class="p-3">
                             <div class="exam-list__empty">
                                 <span class="exam-list__empty-icon" aria-hidden="true"><i class="bi bi-journal-x"></i></span>
                                 <h3 class="h5 fw-bold">No examinations yet</h3>
@@ -445,6 +720,117 @@
             </table>
         </div>
     </section>
+    @foreach ($tests as $test)
+        @php($status = $test->scheduleStatus())
+        @php($timeLimit = $test->time_limit ?? $test->duration_minutes)
+        @php($canManage = $test->isEditableBy(auth()->user()) && $test->results_count === 0)
+        <div class="modal fade" id="examDetailsModal{{ $test->id }}" tabindex="-1" aria-labelledby="examDetailsModalLabel{{ $test->id }}" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content exam-list__details-modal border-0 shadow-lg rounded-4 overflow-hidden">
+                    <div class="modal-header">
+                        <div class="exam-list__details-header">
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                <span class="exam-list__eyebrow">Examination details</span>
+                                <span class="badge rounded-pill exam-list__status exam-list__status--{{ strtolower($status) }}">{{ $status }}</span>
+                            </div>
+                            <h2 class="modal-title h4 fw-bold mb-2" id="examDetailsModalLabel{{ $test->id }}">{{ $test->title }}</h2>
+                            <p class="exam-list__details-program small mb-0">{{ $test->course->name ?? 'Unknown program' }}@if ($test->topic) <span aria-hidden="true">·</span> {{ $test->topic }}@endif</p>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if ($test->description)
+                            <div class="exam-list__details-description mb-3">
+                                <span class="exam-list__detail-label">Instructions</span>
+                                <p class="mb-0">{{ $test->description }}</p>
+                            </div>
+                        @endif
+                        <div class="exam-list__overview-grid mb-4" role="group" aria-label="Examination summary">
+                            <div class="exam-list__overview-stat">
+                                <span class="exam-list__overview-icon" aria-hidden="true"><i class="bi bi-card-checklist"></i></span>
+                                <div>
+                                    <span class="exam-list__overview-label">Questions</span>
+                                    <span class="exam-list__overview-value">{{ $test->questions_count }} {{ \Illuminate\Support\Str::plural('question', $test->questions_count) }}</span>
+                                </div>
+                            </div>
+                            <div class="exam-list__overview-stat">
+                                <span class="exam-list__overview-icon" aria-hidden="true"><i class="bi bi-bar-chart-line"></i></span>
+                                <div>
+                                    <span class="exam-list__overview-label">Results</span>
+                                    <span class="exam-list__overview-value">{{ $test->results_count }} {{ \Illuminate\Support\Str::plural('result', $test->results_count) }}</span>
+                                </div>
+                            </div>
+                            <div class="exam-list__overview-stat">
+                                <span class="exam-list__overview-icon" aria-hidden="true"><i class="bi bi-clock-history"></i></span>
+                                <div>
+                                    <span class="exam-list__overview-label">Time limit</span>
+                                    <span class="exam-list__overview-value">
+                                        @if ($timeLimit)
+                                            {{ $timeLimit }} {{ \Illuminate\Support\Str::plural('minute', $timeLimit) }}
+                                        @else
+                                            Not set
+                                        @endif
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <h3 class="exam-list__details-section-title">Schedule and ownership</h3>
+                        <div class="exam-list__details-grid">
+                            <div class="exam-list__detail-item">
+                                <span class="exam-list__detail-label">Created by</span>
+                                <span class="exam-list__detail-value">{{ $test->creator->name ?? 'Former Faculty' }}</span>
+                            </div>
+                            <div class="exam-list__detail-item">
+                                <span class="exam-list__detail-label">Availability</span>
+                                @if ($test->is_published)
+                                    <span class="exam-list__detail-value">
+                                        Opens
+                                        @if ($test->available_from)
+                                            <time datetime="{{ $test->available_from->toIso8601String() }}">{{ $test->available_from->format('M j, Y · g:i A') }}</time>
+                                        @else
+                                            immediately
+                                        @endif
+                                    </span>
+                                    <span class="small text-muted mt-1">
+                                        @if ($test->available_until)
+                                            Closes <time datetime="{{ $test->available_until->toIso8601String() }}">{{ $test->available_until->format('M j, Y · g:i A') }}</time>
+                                        @else
+                                            No closing date
+                                        @endif
+                                    </span>
+                                @else
+                                    <span class="exam-list__detail-value">Unavailable until approved</span>
+                                @endif
+                            </div>
+                            @if ($test->approval_status === 'rejected' && (int) $test->created_by === (int) auth()->id() && $test->rejection_comment)
+                                <div class="exam-list__detail-item exam-list__detail-item--wide border-danger-subtle">
+                                    <span class="exam-list__detail-label text-danger">Admin comment</span>
+                                    <p class="mb-0">{{ $test->rejection_comment }}</p>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        @if ($canManage)
+                            <form
+                                class="exam-list__delete-form me-auto"
+                                action="{{ route($testRoutePrefix.'.tests.destroy', $test) }}"
+                                method="POST"
+                                onsubmit="return confirm('Delete this examination?');"
+                            >
+                                @csrf
+                                @method('DELETE')
+                                <button class="btn btn-outline-danger rounded-pill px-4" type="submit">
+                                    <i class="bi bi-trash3 me-1" aria-hidden="true"></i>Delete examination
+                                </button>
+                            </form>
+                        @endif
+                        <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endforeach
     @if (auth()->user()->role === 'super-admin')
         @foreach ($tests as $test)
             @if ($test->approval_status === 'pending')
@@ -522,4 +908,15 @@
     @endif
     <div class="mt-3">{{ $tests->links() }}</div>
 </div>
+<script>
+    document.addEventListener('click', (event) => {
+        const row = event.target.closest('[data-exam-details-target]');
+        if (!row || event.target.closest('a, button, form, input, select, textarea, label')) {
+            return;
+        }
+
+        const modal = document.getElementById(row.dataset.examDetailsTarget);
+        bootstrap.Modal.getOrCreateInstance(modal).show();
+    });
+</script>
 @endsection
