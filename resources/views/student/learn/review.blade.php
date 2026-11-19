@@ -104,6 +104,10 @@
         transition: width 0.1s ease-out;
     }
 
+    .review-main {
+        padding-top: 10px !important;
+    }
+
     /* Sticky Navigation Header */
     .reader-navbar {
         position: sticky;
@@ -163,14 +167,22 @@
         border-color: #2563eb;
     }
 
+    .review-sidebar-sticky {
+        position: sticky;
+        top: calc(var(--reader-navbar-height, 53px) + 10px);
+        align-self: flex-start;
+    }
+
     .quiz-companion-card {
         background-color: var(--reader-card-bg);
         border: 1px solid var(--reader-border);
         border-radius: 1.25rem;
         padding: 1.5rem;
-        position: sticky;
-        top: 5rem;
         box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.03);
+    }
+
+    .quiz-checkpoint-footer {
+        margin-top: 10px;
     }
 
     /* ==========================================================
@@ -317,23 +329,6 @@
         border-color: #0f172a;
     }
 
-    #studyTimerPausedModal .modal-dialog,
-    #studyTopicCapModal .modal-dialog {
-        transform: scale(.96);
-        transition: transform .22s ease-out;
-    }
-
-    #studyTimerPausedModal.show .modal-dialog,
-    #studyTopicCapModal.show .modal-dialog {
-        transform: scale(1);
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        #studyTimerPausedModal .modal-dialog,
-        #studyTopicCapModal .modal-dialog {
-            transition: none;
-        }
-    }
 </style>
 
 <div class="review-workspace">
@@ -381,7 +376,7 @@
     </header>
 
     {{-- Main Document Layout --}}
-    <main class="container py-4 py-md-5">
+    <main class="container review-main pb-4 pb-md-5">
         <div class="row g-4 justify-content-center">
             
             <div class="col-lg-8 col-xl-8">
@@ -442,7 +437,7 @@
                 </article>
             </div>
 
-            <aside class="col-lg-4 col-xl-4">
+            <aside class="col-lg-4 col-xl-4 review-sidebar-sticky">
                 <div class="quiz-companion-card">
                     <div class="d-flex align-items-center gap-2 mb-3">
                         <div class="p-2 rounded-circle bg-primary bg-opacity-10 text-primary">
@@ -460,7 +455,7 @@
 
                     <p id="study-tracking-status" class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 mb-3 tabular-nums" role="status" aria-live="polite">
                         Studying: {{ floor($studyTimeSeconds / 60) }}m / 30m
-                        · {{ $hasTopicQuizAttempt ? 'Quiz verified' : 'Take topic quiz to verify' }}
+                        · {{ $hasTopicQuizAttempt ? 'Verified' : 'Take topic quiz to verify' }}
                     </p>
                     <div id="study-time-tracker"
                          data-subtopic-id="{{ $subtopic->id }}"
@@ -492,57 +487,48 @@
                         </a>
                     </div>
 
-                    <div class="mt-4 pt-3 border-top border-secondary border-opacity-10 text-center">
+                    <div class="quiz-checkpoint-footer border-top border-secondary border-opacity-10 text-center">
                         <small class="text-muted d-block mb-1">Pass requirement: <strong>85% Score</strong></small>
                         <span class="badge bg-light text-secondary border rounded-pill px-2.5 py-1" style="font-size: 0.72rem;">
                             <i class="bi bi-shield-lock me-1"></i>Remediation Cleared
                         </span>
                     </div>
                 </div>
-            </aside>
 
+                <div class="alert alert-warning border-warning-subtle rounded-4 shadow-sm mt-3 mb-0" id="studyTimerPausedWarning" role="note" aria-live="polite">
+                    <div class="d-flex align-items-start gap-3">
+                        <i class="bi bi-pause-circle-fill fs-5 mt-1 flex-shrink-0"></i>
+                        <div class="flex-grow-1">
+                            <h2 class="h6 fw-bold mb-1" id="studyTimerPausedTitle">Study Timer Notice</h2>
+                            <p class="small mb-3">Your study timer pauses immediately when you switch tabs and stops automatically after 45 seconds without scrolling or page progress. Repeated clicks in the same spot will not keep the timer active—click Resume Studying to start counting again immediately, and keep scrolling or turning pages to save your next 30-second study block.</p>
+                            <button class="btn btn-warning btn-sm rounded-pill px-3 fw-semibold d-none" id="resumeStudyTimer" type="button">Resume Studying</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-primary border-primary-subtle rounded-4 shadow-sm mt-3 mb-0 d-none" id="studyTopicCapWarning" role="alert">
+                    <div class="d-flex align-items-start gap-3">
+                        <i class="bi bi-hourglass-split fs-5 mt-1 flex-shrink-0"></i>
+                        <div class="flex-grow-1">
+                            <h2 class="h6 fw-bold mb-1">30-Minute Topic Study Limit Reached</h2>
+                            <p class="small mb-3">You have reached the 30-minute maximum creditable study limit for this topic, so your timer has stopped counting additional minutes. Complete at least 1 quiz attempt on this topic to verify your study hours for the leaderboard.</p>
+                            <div class="d-flex flex-wrap justify-content-between gap-2">
+                                <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="continueUntimedStudy" type="button">Continue Reading (Untimed)</button>
+                                <a href="{{ route('student.learn.quiz', ['subtopic' => $subtopic, 'question_type' => 'multiple_choice']) }}"
+                                   id="studyTopicCapQuiz"
+                                   data-question-type="multiple-choice"
+                                   data-quiz-topic="{{ $subtopic->title }}"
+                                   class="btn btn-primary btn-sm rounded-pill px-3">
+                                    Take Topic Quiz
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
         </div>
     </main>
 
-</div>
-
-<div class="modal fade" id="studyTimerPausedModal" tabindex="-1" aria-labelledby="studyTimerPausedTitle" aria-describedby="studyTimerPausedMessage" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg rounded-4">
-            <div class="modal-header border-0 pb-0">
-                <h2 class="modal-title h5 fw-bold" id="studyTimerPausedTitle">Study Timer Paused</h2>
-            </div>
-            <div class="modal-body pt-2">
-                <p class="text-secondary mb-0" id="studyTimerPausedMessage">No reading progress or page scrolling was detected. Repeated clicks in the same spot do not keep the timer active.</p>
-            </div>
-            <div class="modal-footer border-0 pt-0">
-                <button class="btn btn-primary rounded-pill px-4" id="resumeStudyTimer" type="button">Resume Studying</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="studyTopicCapModal" tabindex="-1" aria-labelledby="studyTopicCapTitle" aria-describedby="studyTopicCapMessage" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg rounded-4">
-            <div class="modal-header border-0 pb-0">
-                <h2 class="modal-title h5 fw-bold" id="studyTopicCapTitle">30-Minute Topic Study Limit Reached</h2>
-            </div>
-            <div class="modal-body pt-2">
-                <p class="text-secondary mb-0" id="studyTopicCapMessage">You have reached the maximum creditable study time for this topic. Complete at least 1 quiz attempt on this topic to verify your study hours for the leaderboard.</p>
-            </div>
-            <div class="modal-footer border-0 pt-0 justify-content-between">
-                <button class="btn btn-outline-secondary rounded-pill px-3" id="continueUntimedStudy" type="button">Continue Reading (Untimed)</button>
-                <a href="{{ route('student.learn.quiz', ['subtopic' => $subtopic, 'question_type' => 'multiple_choice']) }}"
-                   id="studyTopicCapQuiz"
-                   data-question-type="multiple-choice"
-                   data-quiz-topic="{{ $subtopic->title }}"
-                   class="btn btn-primary rounded-pill px-4">
-                    Take Topic Quiz
-                </a>
-            </div>
-        </div>
-    </div>
 </div>
 
 {{-- MODAL: QUIZ PREPARATION SPINNER --}}
@@ -1151,6 +1137,19 @@
 </script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const readerNavbar = document.querySelector('.reader-navbar');
+        function updateSidebarOffset() {
+            if (readerNavbar) {
+                document.documentElement.style.setProperty(
+                    '--reader-navbar-height',
+                    `${readerNavbar.getBoundingClientRect().height}px`,
+                );
+            }
+        }
+
+        updateSidebarOffset();
+        window.addEventListener('resize', updateSidebarOffset, { passive: true });
+
         const tracker = document.getElementById('study-time-tracker');
         const status = document.getElementById('study-tracking-status');
         if (!tracker || !status) {
@@ -1161,9 +1160,9 @@
         const heartbeatUrl = tracker.dataset.heartbeatUrl;
         const stopUrlTemplate = tracker.dataset.stopUrlTemplate;
         const csrfToken = tracker.dataset.csrfToken;
-        const capModal = document.getElementById('studyTopicCapModal');
-        const pausedModal = document.getElementById('studyTimerPausedModal');
-        const isVerified = tracker.dataset.verified === 'true';
+        const capWarning = document.getElementById('studyTopicCapWarning');
+        const pausedWarning = document.getElementById('studyTimerPausedWarning');
+        let isVerified = tracker.dataset.verified === 'true';
         let topicSeconds = Number(tracker.dataset.usedSeconds) || 0;
         let sessionId = null;
         let heartbeatTimer = null;
@@ -1176,7 +1175,9 @@
         let isUntimed = false;
         let lastProgressAt = performance.now();
         let lastWindowScrollY = window.scrollY;
-        let lastReaderScrollTop = document.getElementById('documentBody')?.scrollTop || 0;
+        const documentBody = document.getElementById('documentBody');
+        let lastReaderScrollTop = documentBody?.scrollTop || 0;
+        let lastClickCoordinates = null;
 
         function sessionUrl(template, id) {
             return template.replace('SESSION_ID', encodeURIComponent(id));
@@ -1185,7 +1186,13 @@
         function displayDuration(seconds) {
             topicSeconds = Math.min(Number(seconds) || 0, 1800);
             const minutes = Math.floor(topicSeconds / 60);
-            status.textContent = `Studying: ${minutes}m / 30m · ${isVerified ? 'Quiz verified' : 'Take topic quiz to verify'}`;
+            status.textContent = `Studying: ${minutes}m / 30m · ${isVerified ? 'Verified' : 'Take topic quiz to verify'}`;
+        }
+
+        function updateVerification(data) {
+            if (typeof data.verified === 'boolean') {
+                isVerified = data.verified;
+            }
         }
 
         async function postJson(url, body, keepalive) {
@@ -1211,12 +1218,12 @@
             return data;
         }
 
-        function showTopicCapModal() {
+        function showTopicCapWarning() {
             sessionId = null;
             window.clearInterval(heartbeatTimer);
             heartbeatTimer = null;
             displayDuration(1800);
-            bootstrap.Modal.getOrCreateInstance(capModal).show();
+            capWarning.classList.remove('d-none');
         }
 
         function progressFromScroll(event, readerScroll = false) {
@@ -1240,6 +1247,20 @@
             lastProgressAt = performance.now();
         }
 
+        function progressFromClick(event) {
+            if (!event.isTrusted || !documentBody?.contains(event.target)) {
+                return;
+            }
+
+            const coordinates = `${event.clientX}:${event.clientY}`;
+            if (coordinates === lastClickCoordinates) {
+                return;
+            }
+
+            lastClickCoordinates = coordinates;
+            lastProgressAt = performance.now();
+        }
+
         function pauseForNoProgress() {
             if (!sessionId || isPausedForInactivity || isLeavingForQuiz || isLeavingPage) {
                 return;
@@ -1249,7 +1270,9 @@
             status.textContent = `Study timer paused · ${Math.floor(topicSeconds / 60)}m / 30m`;
             stopSession('inactive', false).then((data) => {
                 if (!data?.capped) {
-                    bootstrap.Modal.getOrCreateInstance(pausedModal).show();
+                    document.getElementById('studyTimerPausedTitle').textContent = 'Study Timer Paused';
+                    pausedWarning.setAttribute('role', 'alert');
+                    document.getElementById('resumeStudyTimer').classList.remove('d-none');
                 }
             });
         }
@@ -1274,9 +1297,10 @@
                 try {
                     const data = await postJson(startUrl, { subtopic_id: tracker.dataset.subtopicId });
                     sessionId = data.session_id;
+                    updateVerification(data);
                     displayDuration(data.active_seconds);
                     if (data.capped || data.remaining_seconds <= 0) {
-                        showTopicCapModal();
+                        showTopicCapWarning();
                         return;
                     }
                     lastProgressAt = performance.now();
@@ -1313,13 +1337,17 @@
             const operation = (async function () {
                 try {
                     const data = await postJson(heartbeatUrl, { session_id: sessionId });
+                    updateVerification(data);
                     displayDuration(data.active_seconds);
                     if (data.capped || data.remaining_seconds <= 0) {
-                        showTopicCapModal();
+                        showTopicCapWarning();
                     }
                 } catch (heartbeatError) {
+                    if (heartbeatError.data) {
+                        updateVerification(heartbeatError.data);
+                    }
                     if (heartbeatError.data?.capped) {
-                        showTopicCapModal();
+                        showTopicCapWarning();
                     } else if (heartbeatError.status === 409) {
                         sessionId = null;
                         window.clearInterval(heartbeatTimer);
@@ -1360,6 +1388,7 @@
                 try {
                     const data = await postJson(sessionUrl(stopUrlTemplate, activeSessionId), { reason }, keepalive);
                     stopData = data;
+                    updateVerification(data);
                     displayDuration(data.active_seconds);
                     if (
                         data.capped
@@ -1368,7 +1397,7 @@
                         && document.visibilityState === 'visible'
                         && document.hasFocus()
                     ) {
-                        showTopicCapModal();
+                        showTopicCapWarning();
                     }
                     if (reason === 'quiz') {
                         status.textContent = `Quiz started · ${Math.floor(data.active_seconds / 60)}m / 30m`;
@@ -1376,6 +1405,9 @@
                         status.textContent = `Timer paused while this page is hidden · ${Math.floor(data.active_seconds / 60)}m / 30m`;
                     }
                 } catch (stopError) {
+                    if (stopError.data) {
+                        updateVerification(stopError.data);
+                    }
                     status.textContent = `Study-time tracking could not be stopped cleanly: ${stopError.message}`;
                 } finally {
                     requestPending = false;
@@ -1390,9 +1422,9 @@
         }
 
         window.addEventListener('scroll', (event) => progressFromScroll(event), { passive: true });
-        const readerBody = document.getElementById('documentBody');
-        if (readerBody) {
-            readerBody.addEventListener('scroll', (event) => progressFromScroll(event, true), { passive: true });
+        if (documentBody) {
+            documentBody.addEventListener('scroll', (event) => progressFromScroll(event, true), { passive: true });
+            documentBody.addEventListener('click', progressFromClick);
         }
 
         function resumeSessionWhenVisible() {
@@ -1413,7 +1445,9 @@
             }
             isPausedForInactivity = false;
             lastProgressAt = performance.now();
-            bootstrap.Modal.getOrCreateInstance(pausedModal).hide();
+            document.getElementById('studyTimerPausedTitle').textContent = 'Study Timer Notice';
+            pausedWarning.setAttribute('role', 'note');
+            document.getElementById('resumeStudyTimer').classList.add('d-none');
             startSession();
         });
 
@@ -1421,7 +1455,7 @@
             isUntimed = true;
             window.clearInterval(progressTimer);
             status.textContent = '30-minute study limit reached · Reading continues untimed';
-            bootstrap.Modal.getOrCreateInstance(capModal).hide();
+            capWarning.classList.add('d-none');
         });
 
         document.querySelectorAll('#btn-take-quiz, #btn-take-identification-quiz, #studyTopicCapQuiz').forEach(function (link) {
@@ -1479,7 +1513,7 @@
         }, 1000);
 
         if (topicSeconds >= 1800) {
-            showTopicCapModal();
+            showTopicCapWarning();
         }
         startSession();
     });

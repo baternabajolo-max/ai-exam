@@ -47,17 +47,28 @@ class StudentTestController extends Controller
             ->where('is_scheduled_exam', true)
             ->where('approval_status', Test::APPROVAL_STATUS_APPROVED)
             ->where('is_published', true)
-            ->with(['results' => fn ($query) => $query
-                ->where('user_id', $student->id)
-                ->latest('created_at')
-                ->latest('id')
-                ->limit(1), 'retakeGrants' => fn ($query) => $query
-                ->where('student_id', $student->id)
-                ->whereNull('consumed_at')])
+            ->with([
+                'course:id,name',
+                'results' => fn ($query) => $query
+                    ->where('user_id', $student->id)
+                    ->latest('created_at')
+                    ->latest('id')
+                    ->limit(1),
+                'retakeGrants' => fn ($query) => $query
+                    ->where('student_id', $student->id)
+                    ->whereNull('consumed_at'),
+            ])
             ->orderBy('available_from')
             ->get();
+        $availableExams = $exams
+            ->filter(fn (Test $exam): bool => $exam->results->isEmpty())
+            ->values();
+        $takenExams = $exams
+            ->filter(fn (Test $exam): bool => $exam->results->isNotEmpty())
+            ->sortByDesc(fn (Test $exam) => $exam->results->first()?->created_at)
+            ->values();
 
-        return view('student.exams.index', compact('exams'));
+        return view('student.exams.index', compact('availableExams', 'takenExams'));
     }
 
     public function startExam(Test $test)

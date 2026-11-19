@@ -185,6 +185,13 @@ class StudentTestControllerTest extends TestCase
             ->assertJsonPath('status', 'already_completed');
 
         $this->get(route('student.exams.index'))
+            ->assertSee('Your assessments')
+            ->assertSee('0 available · 1 taken')
+            ->assertSee('Taken Exams')
+            ->assertSee('Date taken')
+            ->assertSee($result->created_at->format('M j, Y g:i A'))
+            ->assertSee('Score')
+            ->assertSee($result->score.' / '.$result->total_questions)
             ->assertSee('Completed')
             ->assertSee('View results')
             ->assertDontSee('Open examination');
@@ -222,6 +229,7 @@ class StudentTestControllerTest extends TestCase
         $this->actingAs($student)
             ->get(route('student.exams.index'))
             ->assertSee('Retake available')
+            ->assertSee('student-exams__status--retake', false)
             ->assertSee('Take retake')
             ->assertSee('View results');
 
@@ -320,6 +328,11 @@ class StudentTestControllerTest extends TestCase
             ->get(route('student.exams.index'))
             ->assertOk()
             ->assertSee($scheduledExam->title)
+            ->assertSee('Available Exams')
+            ->assertSee('Taken Exams')
+            ->assertSee('Due date')
+            ->assertSee($scheduledExam->available_until->format('M j, Y g:i A'))
+            ->assertSee($course->name)
             ->assertSee('Scheduled')
             ->assertDontSee('Other Program Exam');
     }

@@ -733,6 +733,68 @@ class StudentActivityControllerTest extends TestCase
             ->assertJsonPath('active_seconds', 1800);
     }
 
+    public function test_quiz_attempt_verification_updates_the_reviewer_and_caps_legacy_display_time(): void
+    {
+        $this->travelTo('2026-10-25 10:00:00');
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $student = User::factory()->create(['role' => 'student', 'department_id' => $department->id]);
+        $module = Module::create(['title' => 'Web Technologies', 'department_id' => $department->id]);
+        $subtopic = Subtopic::create(['module_id' => $module->id, 'title' => 'REST APIs']);
+        $cappedSubtopic = Subtopic::create(['module_id' => $module->id, 'title' => 'HTTP Caching']);
+        $quiz = StudentTest::create([
+            'title' => 'REST APIs Quiz',
+            'department_id' => $department->id,
+            'is_general' => false,
+            'subtopic_id' => $subtopic->id,
+        ]);
+
+        $this->actingAs($student)
+            ->get(route('student.learn.review', $subtopic))
+            ->assertOk()
+            ->assertSee('Studying: 0m / 30m')
+            ->assertSee('Take topic quiz to verify');
+
+        $sessionId = $this->postJson(route('student.activity.sessions.store'), ['subtopic_id' => $subtopic->id])
+            ->assertCreated()
+            ->assertJsonPath('verified', false)
+            ->json('session_id');
+
+        Result::create([
+            'user_id' => $student->id,
+            'test_id' => $quiz->id,
+            'score' => 7,
+            'total_questions' => 10,
+        ]);
+
+        $this->travel(30)->seconds();
+        $this->postJson(route('student.study-heartbeat'), ['session_id' => $sessionId])
+            ->assertOk()
+            ->assertJsonPath('active_seconds', 30)
+            ->assertJsonPath('verified', true);
+
+        $this->get(route('student.learn.review', $subtopic))
+            ->assertOk()
+            ->assertSee('Studying: 0m / 30m')
+            ->assertSee('Verified')
+            ->assertSee('data-verified="true"', false);
+
+        StudySession::create([
+            'user_id' => $student->id,
+            'module_id' => $module->id,
+            'subtopic_id' => $cappedSubtopic->id,
+            'activity_date' => '2026-10-25',
+            'active_seconds' => 1801,
+            'started_at' => '2026-10-25 08:00:00',
+            'last_heartbeat_at' => '2026-10-25 08:30:00',
+            'ended_at' => '2026-10-25 08:30:00',
+        ]);
+
+        $this->get(route('student.learn.review', $cappedSubtopic))
+            ->assertOk()
+            ->assertSee('Studying: 30m / 30m')
+            ->assertSee('Take topic quiz to verify');
+    }
+
     public function test_student_cannot_track_another_departments_subtopic_or_another_students_session(): void
     {
         $this->travelTo('2026-10-25 10:00:00');
@@ -798,14 +860,35 @@ class StudentActivityControllerTest extends TestCase
             ->assertSee('Bar height is scaled to monthly hours or minutes.')
             ->assertSee('data-analytics-url="'.route('student.activity.index').'"', false);
 
-        $this->get(route('student.learn.review', $subtopic))
+        $reviewResponse = $this->get(route('student.learn.review', $subtopic));
+        $reviewResponse
             ->assertSee('data-subtopic-id="'.$subtopic->id.'"', false)
             ->assertSee('data-start-url="'.route('student.activity.sessions.store').'"', false)
             ->assertSee('data-heartbeat-url="'.route('student.study-heartbeat').'"', false)
             ->assertSee('Study Timer Paused')
-            ->assertSee('No reading progress or page scrolling was detected.')
+            ->assertSee('Your study timer pauses immediately when you switch tabs and stops automatically after 45 seconds without scrolling or page progress.')
+            ->assertSee('Repeated clicks in the same spot will not keep the timer active')
+            ->assertSee('col-lg-4 col-xl-4 review-sidebar-sticky', false)
+            ->assertSee('padding-top: 10px !important;', false)
+            ->assertSee('top: calc(var(--reader-navbar-height, 53px) + 10px);', false)
+            ->assertSee('margin-top: 10px;', false)
+            ->assertSee('quiz-checkpoint-footer', false)
+            ->assertSee('id="studyTimerPausedWarning" role="note" aria-live="polite"', false)
+            ->assertSee('class="btn btn-warning btn-sm rounded-pill px-3 fw-semibold d-none" id="resumeStudyTimer"', false)
             ->assertSee('30-Minute Topic Study Limit Reached')
+            ->assertSee('You have reached the 30-minute maximum creditable study limit for this topic')
+            ->assertSee('id="studyTopicCapWarning"', false)
             ->assertSee('performance.now() - lastProgressAt >= 45000', false);
+        $reviewContent = $reviewResponse->getContent();
+        $checkpointPosition = strpos($reviewContent, '<div class="quiz-companion-card">');
+        $pausedWarningPosition = strpos($reviewContent, 'id="studyTimerPausedWarning"');
+        $capWarningPosition = strpos($reviewContent, 'id="studyTopicCapWarning"');
+
+        $this->assertNotFalse($checkpointPosition);
+        $this->assertNotFalse($pausedWarningPosition);
+        $this->assertNotFalse($capWarningPosition);
+        $this->assertLessThan($pausedWarningPosition, $checkpointPosition);
+        $this->assertLessThan($capWarningPosition, $pausedWarningPosition);
     }
 
     public function test_activity_session_endpoints_validate_input_without_changing_session_state(): void

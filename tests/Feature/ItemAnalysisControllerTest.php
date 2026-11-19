@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Models\Course;
 use App\Models\Department;
 use App\Models\Question;
+use App\Models\QuestionBankItem;
 use App\Models\Result;
 use App\Models\Test as Exam;
+use App\Models\Topic;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
@@ -18,19 +20,211 @@ class ItemAnalysisControllerTest extends TestCase
     public function test_faculty_selects_an_examination_from_a_modal(): void
     {
         [$department, $course] = $this->createProgram('Computing', 'COMP', 'Software Engineering', 'SE');
+        $otherCourse = Course::create([
+            'name' => 'Computer Engineering',
+            'code' => 'CPE',
+            'department_id' => $department->id,
+        ]);
         $faculty = User::factory()->create([
             'role' => 'admin',
             'department_id' => $department->id,
             'course_id' => $course->id,
         ]);
         $exam = $this->createExam($department->id, $course->id);
+        $otherExam = $this->createExam($department->id, $otherCourse->id);
+        $otherExam->update(['title' => 'Computer Engineering Examination']);
 
         $this->actingAs($faculty)
             ->get(route('admin.item-analysis.index'))
             ->assertSee('data-bs-target="#selectFacultyExamModal"', false)
             ->assertSee('id="selectFacultyExamModal"', false)
+            ->assertSee('name="course_id"', false)
             ->assertSee('name="test_id"', false)
+            ->assertSee('data-faculty-program-option', false)
+            ->assertSee('Choose a program first')
+            ->assertSee('data-bs-display="static"', false)
+            ->assertSee('role="listbox"', false)
+            ->assertSee('max-height: 11rem;', false)
+            ->assertSee('overflow-y: auto;', false)
+            ->assertSee('data-faculty-exam-option', false)
+            ->assertSee('data-course-id="'.$course->id.'"', false)
+            ->assertSee('data-course-id="'.$otherCourse->id.'"', false)
             ->assertSee($exam->title);
+
+        $selectedResponse = $this->actingAs($faculty)
+            ->get(route('admin.item-analysis.index', [
+                'course_id' => $course->id,
+                'test_id' => $exam->id,
+            ]));
+
+        $this->assertSame($course->id, $selectedResponse->viewData('selectedCourseId'));
+        $this->assertSame($exam->id, $selectedResponse->viewData('selectedTest')->id);
+    }
+
+    public function test_faculty_cannot_open_an_examination_that_does_not_belong_to_the_selected_program(): void
+    {
+        [$department, $course] = $this->createProgram('Computing', 'COMP', 'Software Engineering', 'SE');
+        $otherCourse = Course::create([
+            'name' => 'Computer Engineering',
+            'code' => 'CPE',
+            'department_id' => $department->id,
+        ]);
+        $faculty = User::factory()->create([
+            'role' => 'admin',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $otherExam = $this->createExam($department->id, $otherCourse->id);
+
+        $this->actingAs($faculty)
+            ->get(route('admin.item-analysis.index', [
+                'course_id' => $course->id,
+                'test_id' => $otherExam->id,
+            ]))
+            ->assertNotFound();
+    }
+
+    public function test_topic_filter_only_lists_topics_from_the_selected_examination(): void
+    {
+        [$department, $course] = $this->createProgram('Computing', 'COMP', 'Software Engineering', 'SE');
+        $faculty = User::factory()->create([
+            'role' => 'admin',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $networkExam = $this->createExam($department->id, $course->id);
+        $networkExam->update(['title' => 'Network Examination']);
+        $emailExam = $this->createExam($department->id, $course->id);
+        $emailExam->update(['title' => 'Email Examination']);
+        Question::create([
+            'test_id' => $networkExam->id,
+            'question' => 'Which protocol protects web traffic?',
+            'options' => ['HTTPS', 'FTP'],
+            'correct_answer' => 'HTTPS',
+            'topic' => 'Network security',
+        ]);
+        Question::create([
+            'test_id' => $emailExam->id,
+            'question' => 'Which protocol sends email?',
+            'options' => ['SMTP', 'FTP'],
+            'correct_answer' => 'SMTP',
+            'topic' => 'Email protocols',
+        ]);
+
+        $networkResponse = $this->actingAs($faculty)
+            ->get(route('admin.item-analysis.index', ['test_id' => $networkExam->id]))
+            ->assertSee('value="Network security"', false)
+            ->assertDontSee('value="Email protocols"', false);
+
+        $this->assertSame(['Network security'], $networkResponse->viewData('topics'));
+
+        $emailResponse = $this->actingAs($faculty)
+            ->get(route('admin.item-analysis.index', [
+                'test_id' => $emailExam->id,
+                'topic' => 'Network security',
+            ]))
+            ->assertSee('value="Email protocols"', false)
+            ->assertDontSee('value="Network security"', false);
+
+        $this->assertSame(['Email protocols'], $emailResponse->viewData('topics'));
+        $this->assertSame('', $emailResponse->viewData('filters')['topic']);
+        $this->assertCount(1, $emailResponse->viewData('analysis'));
+    }
+
+    public function test_faculty_can_filter_questions_by_difficulty_including_legacy_medium_values(): void
+    {
+        [$department, $course] = $this->createProgram('Computing', 'COMP', 'Software Engineering', 'SE');
+        $faculty = User::factory()->create([
+            'role' => 'admin',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $exam = $this->createExam($department->id, $course->id);
+        $questions = [];
+
+        foreach ([
+            'Easy question' => 'easy',
+            'Medium question' => 'medium',
+            'Moderate question' => 'moderate',
+            'Hard question' => 'hard',
+        ] as $questionText => $difficulty) {
+            $questions[$difficulty][] = Question::create([
+                'test_id' => $exam->id,
+                'question' => $questionText,
+                'options' => ['A', 'B'],
+                'correct_answer' => 'A',
+                'difficulty' => $difficulty,
+            ]);
+        }
+
+        $response = $this->actingAs($faculty)
+            ->get(route('admin.item-analysis.index', [
+                'test_id' => $exam->id,
+                'difficulty' => 'moderate',
+            ]))
+            ->assertSee('id="analysis-difficulty"', false)
+            ->assertSee('value="moderate" selected', false)
+            ->assertSee('Medium question')
+            ->assertSee('Moderate question')
+            ->assertDontSee('Easy question')
+            ->assertDontSee('Hard question');
+
+        $this->assertSame('moderate', $response->viewData('filters')['difficulty']);
+        $this->assertSame(
+            [$questions['medium'][0]->question, $questions['moderate'][0]->question],
+            array_column($response->viewData('analysis'), 'question'),
+        );
+    }
+
+    public function test_item_analysis_uses_the_question_bank_folder_instead_of_a_legacy_non_folder_topic(): void
+    {
+        [$department, $course] = $this->createProgram('Computing', 'COMP', 'Software Engineering', 'SE');
+        $faculty = User::factory()->create([
+            'role' => 'admin',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $topic = Topic::create([
+            'course_id' => $course->id,
+            'created_by' => $faculty->id,
+            'name' => 'test',
+        ]);
+        $legacyTopic = Topic::create([
+            'course_id' => $course->id,
+            'created_by' => $faculty->id,
+            'is_folder' => false,
+            'name' => 'General',
+        ]);
+        $questionBankItem = QuestionBankItem::create([
+            'course_id' => $course->id,
+            'topic_id' => $topic->id,
+            'author_id' => $faculty->id,
+            'question' => 'Example question',
+            'options' => ['A', 'B'],
+            'correct_answer' => 'A',
+            'topic' => 'test',
+        ]);
+        $exam = $this->createExam($department->id, $course->id);
+        Question::create([
+            'test_id' => $exam->id,
+            'question_bank_item_id' => $questionBankItem->id,
+            'topic_id' => $legacyTopic->id,
+            'question' => 'Example question',
+            'options' => ['A', 'B'],
+            'correct_answer' => 'A',
+            'topic' => 'General',
+        ]);
+
+        $response = $this->actingAs($faculty)
+            ->get(route('admin.item-analysis.index', ['test_id' => $exam->id]))
+            ->assertSee('value="test"', false)
+            ->assertSee('>test</td>', false)
+            ->assertSee('topic_id='.$topic->id, false)
+            ->assertDontSee('value="General"', false);
+
+        $this->assertSame('test', $response->viewData('analysis')[0]['topic']);
+        $this->assertSame($topic->id, $response->viewData('analysis')[0]['topic_id']);
+        $this->assertSame(['test'], $response->viewData('topics'));
     }
 
     public function test_faculty_item_analysis_counts_each_students_latest_response_per_question(): void
@@ -42,17 +236,23 @@ class ItemAnalysisControllerTest extends TestCase
             'course_id' => $course->id,
         ]);
         $firstStudent = User::factory()->create([
+            'name' => 'Student One',
             'role' => 'student',
+            'status' => 'approved',
             'department_id' => $department->id,
             'course_id' => $course->id,
         ]);
         $secondStudent = User::factory()->create([
+            'name' => 'Student Two',
             'role' => 'student',
+            'status' => 'approved',
             'department_id' => $department->id,
             'course_id' => $course->id,
         ]);
         $legacyStudent = User::factory()->create([
+            'name' => 'Student Legacy',
             'role' => 'student',
+            'status' => 'approved',
             'department_id' => $department->id,
             'course_id' => $course->id,
         ]);
@@ -143,12 +343,23 @@ class ItemAnalysisControllerTest extends TestCase
         $response = $this->actingAs($faculty)
             ->get(route('admin.item-analysis.index', ['test_id' => $exam->id]))
             ->assertOk()
+            ->assertSee('Status: Active · 4 result(s)')
             ->assertSee($firstQuestion->question)
             ->assertSee('Review question')
             ->assertSee('aria-label="Review question:', false)
             ->assertSee('data-bs-target="#facultyQuestionReview', false)
             ->assertSee('id="facultyQuestionReview', false)
             ->assertSee('role="img"', false)
+            ->assertSee('bi-funnel', false)
+            ->assertSee('data-bs-target="#analysisFiltersModal"', false)
+            ->assertSee('id="analysisFiltersModal"', false)
+            ->assertSee('aria-label="Open question filters"', false)
+            ->assertDontSee('Search questions')
+            ->assertSee('id="analysis-difficulty"', false)
+            ->assertSee('Most correct')
+            ->assertSee('Most incorrect')
+            ->assertSee('Apply Filter')
+            ->assertSee('Clear filters')
             ->assertSee('Student answer distribution')
             ->assertSee('Unanswered')
             ->assertSee('1 response · 33%')
@@ -158,14 +369,34 @@ class ItemAnalysisControllerTest extends TestCase
             ->assertSee('2 incorrect')
             ->assertSee('The highlighted choice is the answer key')
             ->assertSee('HTTPS encrypts web traffic.')
+            ->assertSee('Individual student responses')
+            ->assertSee('Student One')
+            ->assertSee('Student Two')
+            ->assertSee('Student Legacy')
+            ->assertSee('Export CSV')
+            ->assertSee('Most incorrect')
             ->assertSee('data-bs-target="#facultyQuestionReview2"', false)
             ->assertSee('id="facultyQuestionReview2"', false);
 
         $analysis = collect($response->viewData('analysis'))->keyBy('question');
+        $summary = $response->viewData('summary');
+        $this->assertSame(3, $summary['participants']);
+        $this->assertSame(3, $summary['eligible_students']);
+        $this->assertSame(100, $summary['completion_percentage']);
+        $this->assertSame(17, $summary['average_score_percentage']);
+        $this->assertSame(2, $summary['questions_to_review']);
         $this->assertSame(3, $analysis[$firstQuestion->question]['total']);
         $this->assertSame(1, $analysis[$firstQuestion->question]['correct']);
         $this->assertSame(2, $analysis[$firstQuestion->question]['incorrect']);
         $this->assertSame(67, $analysis[$firstQuestion->question]['incorrect_percentage']);
+        $this->assertSame(
+            [
+                ['student_name' => 'Student Legacy', 'answer' => 'Unanswered', 'is_correct' => false],
+                ['student_name' => 'Student One', 'answer' => 'HTTPS', 'is_correct' => true],
+                ['student_name' => 'Student Two', 'answer' => 'FTP', 'is_correct' => false],
+            ],
+            $analysis[$firstQuestion->question]['student_responses'],
+        );
         $this->assertSame([
             ['label' => 'HTTPS', 'count' => 1, 'percentage' => 33, 'is_correct' => true],
             ['label' => 'FTP', 'count' => 1, 'percentage' => 33, 'is_correct' => false],
@@ -179,6 +410,49 @@ class ItemAnalysisControllerTest extends TestCase
         $this->assertTrue($analysis[$secondQuestion->question]['is_difficult']);
         $this->assertSame(2, $analysis[$thirdQuestion->question]['correct']);
         $this->assertFalse($analysis[$thirdQuestion->question]['is_difficult']);
+
+        $mostCorrectResponse = $this->actingAs($faculty)
+            ->get(route('admin.item-analysis.index', [
+                'test_id' => $exam->id,
+                'sort' => 'most-correct',
+            ]));
+        $this->assertSame(
+            [$thirdQuestion->question, $firstQuestion->question, $secondQuestion->question],
+            array_column($mostCorrectResponse->viewData('analysis'), 'question'),
+        );
+
+        $mostIncorrectResponse = $this->actingAs($faculty)
+            ->get(route('admin.item-analysis.index', [
+                'test_id' => $exam->id,
+                'sort' => 'most-incorrect',
+            ]));
+        $this->assertSame(
+            [$secondQuestion->question, $firstQuestion->question, $thirdQuestion->question],
+            array_column($mostIncorrectResponse->viewData('analysis'), 'question'),
+        );
+
+        $filteredResponse = $this->actingAs($faculty)
+            ->get(route('admin.item-analysis.index', [
+                'test_id' => $exam->id,
+                'review' => 'needs-review',
+                'sort' => 'most-missed',
+            ]));
+
+        $this->assertSame(
+            [$secondQuestion->question, $firstQuestion->question],
+            array_column($filteredResponse->viewData('analysis'), 'question'),
+        );
+
+        $topicFilteredResponse = $this->actingAs($faculty)
+            ->get(route('admin.item-analysis.index', [
+                'test_id' => $exam->id,
+                'topic' => 'Network security',
+            ]));
+
+        $this->assertSame(
+            [$firstQuestion->question, $thirdQuestion->question],
+            array_column($topicFilteredResponse->viewData('analysis'), 'question'),
+        );
     }
 
     public function test_item_analysis_matches_historical_responses_without_question_ids_by_text(): void
@@ -236,6 +510,58 @@ class ItemAnalysisControllerTest extends TestCase
         $this->actingAs($faculty)
             ->get(route('admin.item-analysis.index', ['test_id' => $exam->id]))
             ->assertNotFound();
+
+        $this->actingAs($faculty)
+            ->get(route('admin.item-analysis.export', ['test_id' => $exam->id]))
+            ->assertNotFound();
+    }
+
+    public function test_faculty_can_export_a_safe_question_level_csv_for_their_exam(): void
+    {
+        [$department, $course] = $this->createProgram('Computing', 'COMP', 'Software Engineering', 'SE');
+        $faculty = User::factory()->create([
+            'role' => 'admin',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $student = User::factory()->create([
+            'name' => 'Student Export',
+            'role' => 'student',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $exam = $this->createExam($department->id, $course->id);
+        $question = Question::create([
+            'test_id' => $exam->id,
+            'question' => '=HYPERLINK("https://example.com")',
+            'options' => ['HTTPS', 'FTP'],
+            'correct_answer' => 'HTTPS',
+            'topic' => 'Network security',
+        ]);
+        Result::create([
+            'user_id' => $student->id,
+            'test_id' => $exam->id,
+            'score' => 0,
+            'total_questions' => 1,
+            'answers' => [[
+                'question_id' => $question->id,
+                'question_text' => $question->question,
+                'options' => $question->options,
+                'correct_answer' => $question->correct_answer,
+                'user_answer' => 'FTP',
+                'is_correct' => false,
+            ]],
+        ]);
+
+        $response = $this->actingAs($faculty)
+            ->get(route('admin.item-analysis.export', ['test_id' => $exam->id]));
+
+        $response->assertStreamed()
+            ->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+        $this->assertStringContainsString("'=HYPERLINK", $response->streamedContent());
+        $this->assertStringContainsString('Network security', $response->streamedContent());
+        $this->assertStringContainsString('Needs review', $response->streamedContent());
+        $this->assertStringNotContainsString('Student Export', $response->streamedContent());
     }
 
     public function test_admin_can_inspect_item_analysis_across_programs(): void

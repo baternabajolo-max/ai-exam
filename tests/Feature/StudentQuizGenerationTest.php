@@ -29,7 +29,7 @@ class StudentQuizGenerationTest extends TestCase
             ->get(route('student.learn.review', $subtopic))
             ->assertSee('quizGeneratingModal')
             ->assertSee('Preparing your quiz')
-            ->assertSee('Pausing your study timer before the AI creates questions from this subtopic')
+            ->assertSee('Pausing your study timer before the AI generates 10')
             ->assertSee('aria-labelledby="quizGeneratingModalLabel"', false)
             ->assertSee(route('student.learn.quiz', [
                 'subtopic' => $subtopic,

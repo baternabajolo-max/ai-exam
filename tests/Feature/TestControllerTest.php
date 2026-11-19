@@ -778,7 +778,10 @@ class TestControllerTest extends TestCase
             ->assertSee('<h1 class="h2 fw-bold mb-2">Examinations</h1>', false)
             ->assertDontSee('Examinations &amp; Analysis')
             ->assertSee('exam-list__topic', false)
-            ->assertSee('data-exam-details-target="examDetailsModal'.$exam->id.'"', false)
+            ->assertSee('aria-label="View details for '.$exam->title.'"', false)
+            ->assertSee('data-bs-target="#examDetailsModal'.$exam->id.'"', false)
+            ->assertSee('bi-eye', false)
+            ->assertDontSee('data-exam-details-target', false)
             ->assertSee('id="examDetailsModal'.$exam->id.'"', false)
             ->assertSee('Availability')
             ->assertSee('Questions')
@@ -959,6 +962,8 @@ class TestControllerTest extends TestCase
 
         $defaultList = $this->actingAs($admin)
             ->get(route('super-admin.tests.index'))
+            ->assertSee('class="pagination"', false)
+            ->assertDontSee('class="w-5 h-5"', false)
             ->assertSee('Showing 1–10 of 13 examinations.')
             ->assertSee('View all')
             ->assertViewHas('tests', fn ($tests): bool => $tests->count() === 10 && $tests->total() === 13);
@@ -1101,8 +1106,12 @@ class TestControllerTest extends TestCase
             ->assertSee('id="examDetailsModal'.$ownedFutureExam->id.'"', false)
             ->assertSee('exam-list__delete-form', false)
             ->assertSee('action="'.route('admin.tests.destroy', $ownedFutureExam).'"', false)
+            ->assertSee('data-delete-exam="'.$ownedFutureExam->id.'"', false)
+            ->assertSee('data-delete-unavailable="'.$activeExam->id.'"', false)
+            ->assertSee('This examination can only be deleted before it opens.')
             ->assertDontSee('href="'.route('admin.tests.edit', $activeExam).'"', false)
             ->assertDontSee('action="'.route('admin.tests.destroy', $activeExam).'"', false)
+            ->assertDontSee('data-delete-exam="'.$activeExam->id.'"', false)
             ->assertDontSee('href="'.route('admin.tests.edit', $futureExam).'"', false);
 
         $this->assertDatabaseHas('tests', ['id' => $futureExam->id]);

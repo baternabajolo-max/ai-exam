@@ -449,6 +449,7 @@ class StudentActivityController extends Controller
             'active_seconds' => $sessionData['active_seconds'],
             'remaining_seconds' => $sessionData['remaining_seconds'],
             'capped' => $sessionData['capped'],
+            'verified' => $this->topicHasQuizAttempt($student, $subtopic->id),
         ], $sessionData['session'] === null ? 200 : 201);
     }
 
@@ -516,6 +517,7 @@ class StudentActivityController extends Controller
                 'active_seconds' => $heartbeat['active_seconds'],
                 'remaining_seconds' => $heartbeat['remaining_seconds'],
                 'capped' => $heartbeat['capped'],
+                'verified' => $this->topicHasQuizAttempt($student, $studySession->subtopic_id),
             ], 409);
         }
 
@@ -523,6 +525,7 @@ class StudentActivityController extends Controller
             'active_seconds' => $heartbeat['active_seconds'],
             'remaining_seconds' => $heartbeat['remaining_seconds'],
             'capped' => $heartbeat['capped'],
+            'verified' => $this->topicHasQuizAttempt($student, $studySession->subtopic_id),
         ]);
     }
 
@@ -582,7 +585,18 @@ class StudentActivityController extends Controller
             'remaining_seconds' => $sessionData['remaining_seconds'],
             'capped' => $sessionData['capped'],
             'stopped' => true,
+            'verified' => $this->topicHasQuizAttempt($student, $studySession->subtopic_id),
         ]);
+    }
+
+    private function topicHasQuizAttempt(User $student, int $subtopicId): bool
+    {
+        return Result::query()
+            ->where('user_id', $student->id)
+            ->whereHas('test', fn ($query) => $query
+                ->where('subtopic_id', $subtopicId)
+                ->where('is_general', false))
+            ->exists();
     }
 
     private function monthlyActivity(User $student, string $registeredMonth, string $currentMonth): JsonResponse

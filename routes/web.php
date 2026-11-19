@@ -239,6 +239,7 @@ Route::middleware(['auth', 'role:admin', TrackFacultyActivity::class])->prefix('
     Route::put('/question-bank/{questionBankItem}', [QuestionBankController::class, 'update'])->name('question-bank.update');
     Route::delete('/question-bank/{questionBankItem}', [QuestionBankController::class, 'destroy'])->name('question-bank.destroy');
     Route::get('/item-analysis', [ItemAnalysisController::class, 'facultyIndex'])->name('item-analysis.index');
+    Route::get('/item-analysis/export', [ItemAnalysisController::class, 'exportFaculty'])->name('item-analysis.export');
 
     // Module Management
     Route::get('/modules', [ModuleController::class, 'index'])->name('modules.index');

@@ -82,10 +82,13 @@ class StudentLearnController extends Controller
             })
             ->latest()
             ->get();
-        $studyTimeSeconds = (int) StudySession::query()
-            ->where('user_id', auth()->id())
-            ->where('subtopic_id', $subtopic->id)
-            ->sum('active_seconds');
+        $studyTimeSeconds = min(
+            (int) StudySession::query()
+                ->where('user_id', auth()->id())
+                ->where('subtopic_id', $subtopic->id)
+                ->sum('active_seconds'),
+            StudySession::TOPIC_STUDY_CAP_SECONDS,
+        );
         $hasTopicQuizAttempt = Result::query()
             ->where('user_id', auth()->id())
             ->whereHas('test', fn ($query) => $query

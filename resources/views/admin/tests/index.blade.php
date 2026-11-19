@@ -3,6 +3,14 @@
 @section('content')
 @php($testRoutePrefix = auth()->user()->role === 'admin' ? 'admin' : 'super-admin')
 <style>
+    #app > main.app-main:has(> .exam-list) {
+        padding-bottom: 10px;
+    }
+
+    .exam-list .pagination {
+        margin-bottom: 0;
+    }
+
     .exam-list__hero {
         background:
             radial-gradient(circle at 90% 15%, rgb(255 255 255 / 13%) 0 5rem, transparent 5.1rem),
@@ -42,17 +50,8 @@
         transition: background-color .18s ease;
     }
 
-    .exam-list__row {
-        cursor: pointer;
-    }
-
-    .exam-list__row:focus-within {
-        outline: 2px solid #a5b4fc;
-        outline-offset: -2px;
-    }
-
-    .exam-list__table tbody tr:hover {
-        --bs-table-bg: #f8faff;
+    .exam-list__table tbody tr:hover > * {
+        --bs-table-bg-state: #eef2ff;
     }
 
     .exam-list__table thead th {
@@ -78,36 +77,13 @@
         overflow-wrap: anywhere;
     }
 
-    .exam-list__details-trigger {
-        align-items: flex-start;
-        background: transparent;
-        border: 0;
-        color: inherit;
-        display: flex;
-        font: inherit;
-        gap: .75rem;
-        justify-content: space-between;
-        padding: 0;
-        text-align: left;
-        width: 100%;
-    }
-
-    .exam-list__details-trigger:focus-visible {
-        border-radius: .35rem;
-        outline: 3px solid rgb(99 102 241 / 35%);
-        outline-offset: 3px;
-    }
-
-    .exam-list__details-trigger .bi-chevron-right {
-        color: #94a3b8;
-        flex: 0 0 auto;
-        margin-top: .15rem;
-        transition: color .18s ease, transform .18s ease;
-    }
-
-    .exam-list__row:hover .exam-list__details-trigger .bi-chevron-right {
-        color: #4338ca;
-        transform: translateX(2px);
+    .exam-list__view-details {
+        align-items: center;
+        display: inline-flex;
+        justify-content: center;
+        min-height: 2.75rem;
+        min-width: 2.75rem;
+        padding: .25rem;
     }
 
     .exam-list__topic {
@@ -337,11 +313,17 @@
     }
 
     .exam-list__actions {
-        align-items: flex-end;
+        align-items: center;
         display: flex;
-        flex-direction: column;
-        gap: .45rem;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: .5rem;
+        justify-content: flex-end;
         min-width: 9.5rem;
+    }
+
+    .exam-list__row-delete-form {
+        margin: 0;
     }
 
     .exam-list__table .btn {
@@ -427,14 +409,14 @@
         }
 
         .exam-list__table tbody td:last-child {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: flex-end;
+            align-items: start;
+            display: grid;
+            grid-template-columns: 7rem minmax(0, 1fr);
             min-width: 0;
         }
 
         .exam-list__table tbody td:last-child::before {
-            margin-right: auto;
+            margin-right: 0;
         }
 
         .exam-list__availability {
@@ -442,6 +424,7 @@
         }
 
         .exam-list__actions {
+            grid-column: 2;
             min-width: 0;
         }
     }
@@ -551,8 +534,8 @@
         color: #f8fafc;
     }
 
-    html[data-bs-theme="dark"] .exam-list__details-trigger .bi-chevron-right {
-        color: #64748b;
+    html[data-bs-theme="dark"] .exam-list__table tbody tr:hover > * {
+        --bs-table-bg-state: #273449;
     }
 
     html[data-bs-theme="dark"] .exam-list__metric {
@@ -589,14 +572,13 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-        .exam-list__table tbody tr,
-        .exam-list__details-trigger .bi-chevron-right {
+        .exam-list__table tbody tr {
             transition: none;
         }
     }
 </style>
 
-<main class="container exam-list py-4 py-lg-5">
+<main class="container exam-list">
     <header class="exam-list__hero d-flex flex-wrap justify-content-between align-items-center gap-4 mb-4">
         <div>
             <div class="exam-list__eyebrow mb-2">Assessment management</div>
@@ -669,42 +651,61 @@
                     @forelse ($tests as $test)
                         @php($status = $test->scheduleStatus())
                         @php($canManage = $test->isEditableBy(auth()->user()) && $test->results_count === 0)
-                        <tr class="exam-list__row" data-exam-details-target="examDetailsModal{{ $test->id }}">
+                        <tr>
                             <td data-label="Examination">
-                                <button
-                                    class="exam-list__details-trigger"
-                                    type="button"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#examDetailsModal{{ $test->id }}"
-                                    aria-label="View details for {{ $test->title }}"
-                                >
-                                    <span class="exam-list__title fw-semibold">{{ $test->title }}</span>
-                                    <i class="bi bi-chevron-right" aria-hidden="true"></i>
-                                </button>
+                                <span class="exam-list__title fw-semibold">{{ $test->title }}</span>
                                 @if ($test->topic)
                                     <span class="exam-list__topic">{{ $test->topic }}</span>
                                 @endif
                             </td>
                             <td data-label="Program">{{ $test->course->name ?? 'Unknown program' }}</td>
                             <td data-label="Status"><span class="badge rounded-pill exam-list__status exam-list__status--{{ strtolower($status) }}">{{ $status }}</span></td>
-                            <td data-label="Actions" class="text-end exam-list__actions">
-                                <a class="btn btn-sm btn-outline-secondary" href="{{ route($testRoutePrefix.'.tests.print', $test) }}" target="_blank" rel="noopener">
-                                    <i class="bi bi-printer me-1" aria-hidden="true"></i>Print
-                                </a>
-                                @if ($canManage)
-                                    <a class="btn btn-sm btn-outline-primary" href="{{ route($testRoutePrefix.'.tests.edit', $test) }}">
-                                        <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Edit
+                            <td data-label="Actions" class="text-end">
+                                <div class="exam-list__actions">
+                                    <a class="btn btn-sm btn-outline-secondary" href="{{ route($testRoutePrefix.'.tests.print', $test) }}" target="_blank" rel="noopener">
+                                        <i class="bi bi-printer me-1" aria-hidden="true"></i>Print
                                     </a>
-                                @endif
-                                @if (auth()->user()->role === 'super-admin')
-                                    @if ($test->approval_status === 'pending')
-                                        <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#reviewExamModal{{ $test->id }}"><i class="bi bi-clipboard-check me-1" aria-hidden="true"></i>Review request</button>
-                                    @elseif ($test->is_published)
-                                        <a class="btn btn-sm btn-outline-primary" href="{{ route('super-admin.item-analysis.index', ['course_id' => $test->course_id, 'test_id' => $test->id]) }}"><i class="bi bi-graph-up-arrow me-1" aria-hidden="true"></i>Analyze</a>
+                                    @if ($canManage)
+                                        <a class="btn btn-sm btn-outline-primary" href="{{ route($testRoutePrefix.'.tests.edit', $test) }}">
+                                            <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Edit
+                                        </a>
                                     @endif
-                                @elseif (auth()->user()->role === 'admin' && $test->is_published && $test->approval_status === 'approved')
-                                    <a class="btn btn-sm btn-outline-primary" href="{{ route('admin.item-analysis.index', ['test_id' => $test->id]) }}"><i class="bi bi-graph-up-arrow me-1" aria-hidden="true"></i>Analyze</a>
-                                @endif
+                                    @if (auth()->user()->role === 'super-admin')
+                                        @if ($test->approval_status === 'pending')
+                                            <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#reviewExamModal{{ $test->id }}"><i class="bi bi-clipboard-check me-1" aria-hidden="true"></i>Review request</button>
+                                        @elseif ($test->is_published)
+                                            <a class="btn btn-sm btn-outline-primary" href="{{ route('super-admin.item-analysis.index', ['course_id' => $test->course_id, 'test_id' => $test->id]) }}"><i class="bi bi-graph-up-arrow me-1" aria-hidden="true"></i>Analyze</a>
+                                        @endif
+                                    @elseif (auth()->user()->role === 'admin' && $test->is_published && $test->approval_status === 'approved')
+                                        <a class="btn btn-sm btn-outline-primary" href="{{ route('admin.item-analysis.index', ['test_id' => $test->id]) }}"><i class="bi bi-graph-up-arrow me-1" aria-hidden="true"></i>Analyze</a>
+                                    @endif
+                                    <button
+                                        class="btn btn-sm btn-outline-primary exam-list__view-details"
+                                        type="button"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#examDetailsModal{{ $test->id }}"
+                                        aria-label="View details for {{ $test->title }}"
+                                        title="View examination details"
+                                    >
+                                        <i class="bi bi-eye" aria-hidden="true"></i>
+                                        <span class="visually-hidden">View details</span>
+                                    </button>
+                                    @if ($canManage)
+                                        <form
+                                            class="exam-list__row-delete-form"
+                                            action="{{ route($testRoutePrefix.'.tests.destroy', $test) }}"
+                                            method="POST"
+                                            data-delete-exam="{{ $test->id }}"
+                                            onsubmit="return confirm('Delete this examination?');"
+                                        >
+                                            @csrf
+                                            @method('DELETE')
+                                            <button class="btn btn-sm btn-outline-danger" type="submit">
+                                                <i class="bi bi-trash3 me-1" aria-hidden="true"></i>Delete
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     @empty
@@ -824,6 +825,26 @@
                                     <i class="bi bi-trash3 me-1" aria-hidden="true"></i>Delete examination
                                 </button>
                             </form>
+                        @else
+                            <div class="exam-list__delete-unavailable me-auto" data-delete-unavailable="{{ $test->id }}">
+                                <button
+                                    class="btn btn-outline-danger rounded-pill px-4"
+                                    type="button"
+                                    disabled
+                                    aria-describedby="exam-delete-unavailable-{{ $test->id }}"
+                                >
+                                    <i class="bi bi-trash3 me-1" aria-hidden="true"></i>Delete examination
+                                </button>
+                                <span class="small text-muted d-block mt-1" id="exam-delete-unavailable-{{ $test->id }}">
+                                    @if ($test->results_count > 0)
+                                        This examination has student results and cannot be deleted.
+                                    @elseif ((int) $test->created_by !== (int) auth()->id())
+                                        Only the examination creator can delete it.
+                                    @else
+                                        This examination can only be deleted before it opens.
+                                    @endif
+                                </span>
+                            </div>
                         @endif
                         <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Close</button>
                     </div>
@@ -908,15 +929,4 @@
     @endif
     <div class="mt-3">{{ $tests->links() }}</div>
 </div>
-<script>
-    document.addEventListener('click', (event) => {
-        const row = event.target.closest('[data-exam-details-target]');
-        if (!row || event.target.closest('a, button, form, input, select, textarea, label')) {
-            return;
-        }
-
-        const modal = document.getElementById(row.dataset.examDetailsTarget);
-        bootstrap.Modal.getOrCreateInstance(modal).show();
-    });
-</script>
 @endsection

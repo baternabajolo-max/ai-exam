@@ -1,0 +1,726 @@
+[1mdiff --git a/app/Http/Controllers/ItemAnalysisController.php b/app/Http/Controllers/ItemAnalysisController.php[m
+[1mindex 11c448a..ce8b0c1 100644[m
+[1m--- a/app/Http/Controllers/ItemAnalysisController.php[m
+[1m+++ b/app/Http/Controllers/ItemAnalysisController.php[m
+[36m@@ -5,14 +5,25 @@[m
+ use App\Models\Course;[m
+ use App\Models\Result;[m
+ use App\Models\Test;[m
+[32m+[m[32muse App\Models\User;[m
+ use Illuminate\Http\Request;[m
+[32m+[m[32muse Illuminate\Validation\Rule;[m
+ use Illuminate\View\View;[m
+[32m+[m[32muse RuntimeException;[m
+[32m+[m[32muse Symfony\Component\HttpFoundation\StreamedResponse;[m
+ [m
+ class ItemAnalysisController extends Controller[m
+ {[m
+     public function facultyIndex(Request $request): View[m
+     {[m
+         $faculty = $request->user();[m
+[32m+[m[32m        $validated = $request->validate([[m
+[32m+[m[32m            'test_id' => ['nullable', 'integer'],[m
+[32m+[m[32m            'search' => ['nullable', 'string', 'max:120'],[m
+[32m+[m[32m            'topic' => ['nullable', 'string', 'max:255'],[m
+[32m+[m[32m            'review' => ['nullable', Rule::in(['all', 'needs-review'])],[m
+[32m+[m[32m            'sort' => ['nullable', Rule::in(['default', 'most-missed', 'fewest-responses'])],[m
+[32m+[m[32m        ]);[m
+         $tests = Test::query()[m
+             ->where('department_id', $faculty->department_id)[m
+             ->where('is_scheduled_exam', true)[m
+[36m@@ -22,16 +33,96 @@[m [mpublic function facultyIndex(Request $request): View[m
+             ->get();[m
+         $selectedTest = null;[m
+         $analysis = [];[m
+[32m+[m[32m        $summary = null;[m
+[32m+[m[32m        $topics = [];[m
+[32m+[m[32m        $filters = [[m
+[32m+[m[32m            'search' => trim($validated['search'] ?? ''),[m
+[32m+[m[32m            'topic' => $validated['topic'] ?? '',[m
+[32m+[m[32m            'review' => $validated['review'] ?? 'all',[m
+[32m+[m[32m            'sort' => $validated['sort'] ?? 'default',[m
+[32m+[m[32m        ];[m
+ [m
+         if ($request->filled('test_id')) {[m
+[31m-            $validated = $request->validate(['test_id' => ['required', 'integer']]);[m
+             $selectedTest = $tests->firstWhere('id', $validated['test_id']);[m
+             abort_if($selectedTest === null, 404);[m
+             $selectedTest->load('questions');[m
+[31m-            $analysis = $this->buildAnalysis($selectedTest);[m
+[32m+[m[32m            $allAnalysis = $this->buildAnalysis($selectedTest);[m
+[32m+[m[32m            $summary = $this->buildFacultySummary($selectedTest, $allAnalysis);[m
+[32m+[m[32m            $topics = collect($allAnalysis)[m
+[32m+[m[32m                ->pluck('topic')[m
+[32m+[m[32m                ->filter()[m
+[32m+[m[32m                ->unique()[m
+[32m+[m[32m                ->sort()[m
+[32m+[m[32m                ->values()[m
+[32m+[m[32m                ->all();[m
+[32m+[m[32m            $analysis = $this->filterAnalysis($allAnalysis, $filters);[m
+         }[m
+ [m
+[31m-        return view('admin.item-analysis.index', compact('tests', 'selectedTest', 'analysis'));[m
+[32m+[m[32m        return view('admin.item-analysis.index', compact('tests', 'selectedTest', 'analysis', 'summary', 'topics', 'filters'));[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    public function exportFaculty(Request $request): StreamedResponse[m
+[32m+[m[32m    {[m
+[32m+[m[32m        $validated = $request->validate([[m
+[32m+[m[32m            'test_id' => ['required', 'integer'],[m
+[32m+[m[32m        ]);[m
+[32m+[m[32m        $test = Test::query()[m
+[32m+[m[32m            ->where('department_id', $request->user()->department_id)[m
+[32m+[m[32m            ->where('is_scheduled_exam', true)[m
+[32m+[m[32m            ->where('is_published', true)[m
+[32m+[m[32m            ->findOrFail($validated['test_id']);[m
+[32m+[m[32m        $test->load('questions');[m
+[32m+[m[32m        $analysis = $this->buildAnalysis($test);[m
+[32m+[m
+[32m+[m[32m        return response()->streamDownload(function () use ($analysis, $test): void {[m
+[32m+[m[32m            $output = fopen('php://output', 'wb');[m
+[32m+[m[32m            if ($output === false) {[m
+[32m+[m[32m                throw new RuntimeException('Unable to open the item analysis export stream.');[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            try {[m
+[32m+[m[32m                $writeRow = function (array $values) use ($output): void {[m
+[32m+[m[32m                    $values = array_map(fn (mixed $value): string => $this->safeCsvCell($value), $values);[m
+[32m+[m[32m                    if (fputcsv($output, $values, ',', '"', '') === false) {[m
+[32m+[m[32m                        throw new RuntimeException('Unable to write the item analysis export.');[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                };[m
+[32m+[m
+[32m+[m[32m                $writeRow([[m
+[32m+[m[32m                    'Examination',[m
+[32m+[m[32m                    'Question',[m
+[32m+[m[32m                    'Topic',[m
+[32m+[m[32m                    'Responses',[m
+[32m+[m[32m                    'Correct',[m
+[32m+[m[32m                    'Correct %',[m
+[32m+[m[32m                    'Incorrect',[m
+[32m+[m[32m                    'Incorrect %',[m
+[32m+[m[32m                    'Most selected incorrect answer',[m
+[32m+[m[32m                    'Answer key',[m
+[32m+[m[32m                    'Review status',[m
+[32m+[m[32m                ]);[m
+[32m+[m
+[32m+[m[32m                foreach ($analysis as $row) {[m
+[32m+[m[32m                    $writeRow([[m
+[32m+[m[32m                        $test->title,[m
+[32m+[m[32m                        $row['question'],[m
+[32m+[m[32m                        $row['topic'] ?? '',[m
+[32m+[m[32m                        $row['total'],[m
+[32m+[m[32m                        $row['correct'],[m
+[32m+[m[32m                        $row['correct_percentage'].'%',[m
+[32m+[m[32m                        $row['incorrect'],[m
+[32m+[m[32m                        $row['incorrect_percentage'].'%',[m
+[32m+[m[32m                        $row['most_selected_distractor']['label'] ?? '',[m
+[32m+[m[32m                        $row['correct_answer'] ?? '',[m
+[32m+[m[32m                        $row['is_difficult'] ? 'Needs review' : 'No high-miss-rate flag',[m
+[32m+[m[32m                    ]);[m
+[32m+[m[32m                }[m
+[32m+[m[32m            } finally {[m
+[32m+[m[32m                fclose($output);[m
+[32m+[m[32m            }[m
+[32m+[m[32m        }, 'item-analysis-'.$test->id.'.csv', [[m
+[32m+[m[32m            'Content-Type' => 'text/csv; charset=UTF-8',[m
+[32m+[m[32m        ]);[m
+     }[m
+ [m
+     public function adminIndex(Request $request): View[m
+[36m@@ -76,7 +167,7 @@[m [mpublic function adminIndex(Request $request): View[m
+     }[m
+ [m
+     /**[m
+[31m-     * @return array<int, array{question: string, topic: ?string, total: int, correct: int, incorrect: int, correct_percentage: int, incorrect_percentage: int, is_difficult: bool, options: array<int, string>, correct_answer: ?string, explanation: ?string, response_breakdown: array<int, array{label: string, count: int, percentage: int, is_correct: bool}>}>[m
+[32m+[m[32m     * @return array<int, array{question: string, question_id: ?int, question_bank_item_id: ?int, topic_id: ?int, topic: ?string, total: int, correct: int, incorrect: int, correct_percentage: int, incorrect_percentage: int, is_difficult: bool, options: array<int, string>, correct_answer: ?string, explanation: ?string, most_selected_distractor: ?array{label: string, count: int, percentage: int, is_correct: bool}, student_responses: array<int, array{student_name: string, answer: string, is_correct: bool}>, response_breakdown: array<int, array{label: string, count: int, percentage: int, is_correct: bool}>}>[m
+      */[m
+     private function buildAnalysis(Test $test): array[m
+     {[m
+[36m@@ -90,6 +181,9 @@[m [mprivate function buildAnalysis(Test $test): array[m
+             );[m
+             $rows[$key] = [[m
+                 'question' => $question->question,[m
+[32m+[m[32m                'question_id' => $question->id,[m
+[32m+[m[32m                'question_bank_item_id' => $question->question_bank_item_id,[m
+[32m+[m[32m                'topic_id' => $question->topic_id,[m
+                 'topic' => $question->topic ?? $test->topic,[m
+                 'options' => is_array($question->options) ? array_values($question->options) : [],[m
+                 'correct_answer' => $question->correct_answer,[m
+[36m@@ -101,6 +195,7 @@[m [mprivate function buildAnalysis(Test $test): array[m
+                 'incorrect_percentage' => 0,[m
+                 'is_difficult' => false,[m
+                 'response_counts' => [],[m
+[32m+[m[32m                'student_responses' => [],[m
+             ];[m
+             $questionKeysByText[$this->normalizedQuestionText($question->question)] ??= $key;[m
+         }[m
+[36m@@ -112,7 +207,8 @@[m [mprivate function buildAnalysis(Test $test): array[m
+ [m
+         foreach (Result::query()[m
+             ->whereIn('id', $latestResultIds)[m
+[31m-            ->select(['id', 'answers'])[m
+[32m+[m[32m            ->with('user:id,name')[m
+[32m+[m[32m            ->select(['id', 'user_id', 'answers'])[m
+             ->lazyById(100) as $result) {[m
+             foreach ($result->answers ?? [] as $answer) {[m
+                 if (! is_array($answer)) {[m
+[36m@@ -132,6 +228,9 @@[m [mprivate function buildAnalysis(Test $test): array[m
+                     : $this->questionKey($questionText, $questionId, $questionBankItemId);[m
+                 $rows[$key] ??= [[m
+                     'question' => $questionText,[m
+[32m+[m[32m                    'question_id' => $questionId,[m
+[32m+[m[32m                    'question_bank_item_id' => $questionBankItemId,[m
+[32m+[m[32m                    'topic_id' => isset($answer['topic_id']) ? (int) $answer['topic_id'] : null,[m
+                     'topic' => isset($answer['topic']) ? (string) $answer['topic'] : $test->topic,[m
+                     'options' => is_array($answer['options'] ?? null) ? array_values($answer['options']) : [],[m
+                     'correct_answer' => is_scalar($answer['correct_answer'] ?? null)[m
+[36m@@ -147,9 +246,8 @@[m [mprivate function buildAnalysis(Test $test): array[m
+                     'incorrect_percentage' => 0,[m
+                     'is_difficult' => false,[m
+                     'response_counts' => [],[m
+[32m+[m[32m                    'student_responses' => [],[m
+                 ];[m
+[31m-                $rows[$key]['total']++;[m
+[31m-[m
+                 $userAnswer = $answer['user_answer'] ?? $answer['student_answer'] ?? null;[m
+                 $responseLabel = is_scalar($userAnswer) ? trim((string) $userAnswer) : '';[m
+                 if ($responseLabel === '') {[m
+[36m@@ -166,15 +264,13 @@[m [mprivate function buildAnalysis(Test $test): array[m
+                         }[m
+                     }[m
+                 }[m
+[31m-                $responseKey = mb_strtolower($responseLabel);[m
+[31m-                $rows[$key]['response_counts'][$responseKey] ??= ['label' => $responseLabel, 'count' => 0];[m
+[31m-                $rows[$key]['response_counts'][$responseKey]['count']++;[m
+ [m
+[31m-                if (filter_var($answer['is_correct'] ?? false, FILTER_VALIDATE_BOOLEAN)) {[m
+[31m-                    $rows[$key]['correct']++;[m
+[31m-                } else {[m
+[31m-                    $rows[$key]['incorrect']++;[m
+[31m-                }[m
+[32m+[m[32m                $this->recordStudentResponse([m
+[32m+[m[32m                    $rows[$key],[m
+[32m+[m[32m                    $result,[m
+[32m+[m[32m                    $responseLabel,[m
+[32m+[m[32m                    filter_var($answer['is_correct'] ?? false, FILTER_VALIDATE_BOOLEAN),[m
+[32m+[m[32m                );[m
+             }[m
+         }[m
+ [m
+[36m@@ -225,6 +321,20 @@[m [mprivate function buildAnalysis(Test $test): array[m
+                 ],[m
+                 array_values($row['response_counts']),[m
+             );[m
+[32m+[m[32m            $incorrectResponses = array_values(array_filter([m
+[32m+[m[32m                $row['response_breakdown'],[m
+[32m+[m[32m                fn (array $response): bool => ! $response['is_correct'][m
+[32m+[m[32m                    && $response['count'] > 0[m
+[32m+[m[32m                    && $response['label'] !== 'Unanswered',[m
+[32m+[m[32m            ));[m
+[32m+[m[32m            usort($incorrectResponses, fn (array $left, array $right): int => $right['count'] <=> $left['count']);[m
+[32m+[m[32m            $row['most_selected_distractor'] = $correctAnswerLabel !== null[m
+[32m+[m[32m                ? ($incorrectResponses[0] ?? null)[m
+[32m+[m[32m                : null;[m
+[32m+[m[32m            usort([m
+[32m+[m[32m                $row['student_responses'],[m
+[32m+[m[32m                fn (array $left, array $right): int => strcasecmp($left['student_name'], $right['student_name']),[m
+[32m+[m[32m            );[m
+             unset($row['response_counts']);[m
+         }[m
+         unset($row);[m
+[36m@@ -232,6 +342,110 @@[m [mprivate function buildAnalysis(Test $test): array[m
+         return array_values($rows);[m
+     }[m
+ [m
+[32m+[m[32m    /**[m
+[32m+[m[32m     * @param  array<string, mixed>  $row[m
+[32m+[m[32m     */[m
+[32m+[m[32m    private function recordStudentResponse(array &$row, Result $result, string $responseLabel, bool $isCorrect): void[m
+[32m+[m[32m    {[m
+[32m+[m[32m        $row['total']++;[m
+[32m+[m[32m        $responseKey = mb_strtolower($responseLabel);[m
+[32m+[m[32m        $row['response_counts'][$responseKey] ??= ['label' => $responseLabel, 'count' => 0];[m
+[32m+[m[32m        $row['response_counts'][$responseKey]['count']++;[m
+[32m+[m[32m        $row['student_responses'][] = [[m
+[32m+[m[32m            'student_name' => $result->user?->name ?? 'Student unavailable',[m
+[32m+[m[32m            'answer' => $responseLabel,[m
+[32m+[m[32m            'is_correct' => $isCorrect,[m
+[32m+[m[32m        ];[m
+[32m+[m
+[32m+[m[32m        if ($isCorrect) {[m
+[32m+[m[32m            $row['correct']++;[m
+[32m+[m[32m        } else {[m
+[32m+[m[32m            $row['incorrect']++;[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    /**[m
+[32m+[m[32m     * @param  array<int, array<string, mixed>>  $analysis[m
+[32m+[m[32m     * @return array<string, int|null>[m
+[32m+[m[32m     */[m
+[32m+[m[32m    private function buildFacultySummary(Test $test, array $analysis): array[m
+[32m+[m[32m    {[m
+[32m+[m[32m        $latestResultIds = Result::query()[m
+[32m+[m[32m            ->where('test_id', $test->id)[m
+[32m+[m[32m            ->selectRaw('MAX(id)')[m
+[32m+[m[32m            ->groupBy('user_id');[m
+[32m+[m[32m        $resultSummary = Result::query()[m
+[32m+[m[32m            ->whereIn('id', $latestResultIds)[m
+[32m+[m[32m            ->selectRaw('COUNT(*) as participant_count')[m
+[32m+[m[32m            ->selectRaw('AVG(CASE WHEN total_questions > 0 THEN score * 100.0 / total_questions END) as average_score_percentage')[m
+[32m+[m[32m            ->first();[m
+[32m+[m[32m        $eligibleStudents = User::query()[m
+[32m+[m[32m            ->where('role', 'student')[m
+[32m+[m[32m            ->where('department_id', $test->department_id)[m
+[32m+[m[32m            ->when($test->course_id !== null, fn ($query) => $query->where('course_id', $test->course_id))[m
+[32m+[m[32m            ->count();[m
+[32m+[m[32m        $participants = (int) ($resultSummary->participant_count ?? 0);[m
+[32m+[m
+[32m+[m[32m        return [[m
+[32m+[m[32m            'participants' => $participants,[m
+[32m+[m[32m            'eligible_students' => $eligibleStudents,[m
+[32m+[m[32m            'completion_percentage' => $eligibleStudents > 0[m
+[32m+[m[32m                ? (int) round(($participants / $eligibleStudents) * 100)[m
+[32m+[m[32m                : null,[m
+[32m+[m[32m            'average_score_percentage' => $resultSummary->average_score_percentage === null[m
+[32m+[m[32m                ? null[m
+[32m+[m[32m                : (int) round((float) $resultSummary->average_score_percentage),[m
+[32m+[m[32m            'questions_to_review' => count(array_filter([m
+[32m+[m[32m                $analysis,[m
+[32m+[m[32m                fn (array $row): bool => $row['is_difficult'],[m
+[32m+[m[32m            )),[m
+[32m+[m[32m            'question_count' => count($analysis),[m
+[32m+[m[32m        ];[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    /**[m
+[32m+[m[32m     * @param  array<int, array<string, mixed>>  $analysis[m
+[32m+[m[32m     * @param  array{search: string, topic: string, review: string, sort: string}  $filters[m
+[32m+[m[32m     * @return array<int, array<string, mixed>>[m
+[32m+[m[32m     */[m
+[32m+[m[32m    private function filterAnalysis(array $analysis, array $filters): array[m
+[32m+[m[32m    {[m
+[32m+[m[32m        $search = mb_strtolower($filters['search'], 'UTF-8');[m
+[32m+[m[32m        $filtered = array_values(array_filter($analysis, function (array $row) use ($filters, $search): bool {[m
+[32m+[m[32m            if ($filters['topic'] !== '' && $row['topic'] !== $filters['topic']) {[m
+[32m+[m[32m                return false;[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            if ($filters['review'] === 'needs-review' && ! $row['is_difficult']) {[m
+[32m+[m[32m                return false;[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            return $search === ''[m
+[32m+[m[32m                || str_contains([m
+[32m+[m[32m                    mb_strtolower($row['question'].' '.($row['topic'] ?? ''), 'UTF-8'),[m
+[32m+[m[32m                    $search,[m
+[32m+[m[32m                );[m
+[32m+[m[32m        }));[m
+[32m+[m
+[32m+[m[32m        if ($filters['sort'] === 'most-missed') {[m
+[32m+[m[32m            usort($filtered, fn (array $left, array $right): int => ($right['incorrect_percentage'] <=> $left['incorrect_percentage'])[m
+[32m+[m[32m                ?: ($right['total'] <=> $left['total']));[m
+[32m+[m[32m        } elseif ($filters['sort'] === 'fewest-responses') {[m
+[32m+[m[32m            usort($filtered, fn (array $left, array $right): int => $left['total'] <=> $right['total']);[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        return $filtered;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    private function safeCsvCell(mixed $value): string[m
+[32m+[m[32m    {[m
+[32m+[m[32m        $cell = (string) ($value ?? '');[m
+[32m+[m
+[32m+[m[32m        return preg_match('/^[\x00-\x20]*[=+\-@]/', $cell) === 1[m
+[32m+[m[32m            ? "'".$cell[m
+[32m+[m[32m            : $cell;[m
+[32m+[m[32m    }[m
+[32m+[m
+     private function questionKey(string $question, ?int $questionId, ?int $questionBankItemId): string[m
+     {[m
+         if ($questionId !== null) {[m
+[1mdiff --git a/resources/views/admin/item-analysis/index.blade.php b/resources/views/admin/item-analysis/index.blade.php[m
+[1mindex beb0ee1..f73d6ea 100644[m
+[1m--- a/resources/views/admin/item-analysis/index.blade.php[m
+[1m+++ b/resources/views/admin/item-analysis/index.blade.php[m
+[36m@@ -118,6 +118,10 @@[m
+         overflow-wrap: anywhere;[m
+     }[m
+ [m
+[32m+[m[32m    .faculty-analysis__student-table {[m
+[32m+[m[32m        min-width: 30rem;[m
+[32m+[m[32m    }[m
+[32m+[m
+     .faculty-analysis__percent {[m
+         color: #64748b;[m
+         font-size: .8rem;[m
+[36m@@ -317,7 +321,7 @@[m
+     <header class="faculty-analysis__hero mb-4">[m
+         <div class="faculty-analysis__eyebrow mb-2">Assessment insights</div>[m
+         <h1 class="h2 fw-bold mb-2">Item Analysis</h1>[m
+[31m-        <p class="text-white-50 mb-0">Review correct and incorrect student responses for each examination question.</p>[m
+[32m+[m[32m        <p class="text-white-50 mb-0">Find learning gaps, review question performance, and plan focused follow-up.</p>[m
+     </header>[m
+ [m
+     <section class="faculty-analysis__filter-bar d-flex flex-wrap justify-content-between align-items-center gap-3 p-3 p-md-4 mb-4" aria-label="Item analysis filter">[m
+[36m@@ -373,30 +377,120 @@[m
+     </div>[m
+ [m
+     @if ($selectedTest)[m
+[31m-        <section class="faculty-analysis__filter-bar p-3 p-md-4 mb-3">[m
+[32m+[m[32m        <section class="row g-3 mb-3" aria-label="Examination summary">[m
+[32m+[m[32m            <div class="col-sm-6 col-xl-3">[m
+[32m+[m[32m                <article class="faculty-analysis__filter-bar h-100 p-3 p-md-4">[m
+[32m+[m[32m                    <div class="small text-uppercase text-muted fw-bold mb-1">Participation</div>[m
+[32m+[m[32m                    <div class="h3 fw-bold mb-1 font-monospace" id="analysis-participation">[m
+[32m+[m[32m                        {{ $summary['participants'] }}@if ($summary['eligible_students'] > 0) / {{ $summary['eligible_students'] }}@endif[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                    <p class="small text-muted mb-0">[m
+[32m+[m[32m                        @if ($summary['completion_percentage'] !== null)[m
+[32m+[m[32m                            {{ $summary['completion_percentage'] }}% of enrolled students submitted[m
+[32m+[m[32m                        @else[m
+[32m+[m[32m                            Student enrollment is unavailable for this exam.[m
+[32m+[m[32m                        @endif[m
+[32m+[m[32m                    </p>[m
+[32m+[m[32m                </article>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m            <div class="col-sm-6 col-xl-3">[m
+[32m+[m[32m                <article class="faculty-analysis__filter-bar h-100 p-3 p-md-4">[m
+[32m+[m[32m                    <div class="small text-uppercase text-muted fw-bold mb-1">Average score</div>[m
+[32m+[m[32m                    <div class="h3 fw-bold mb-1 font-monospace" id="analysis-average-score">[m
+[32m+[m[32m                        {{ $summary['average_score_percentage'] !== null ? $summary['average_score_percentage'].'%' : '—' }}[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                    <p class="small text-muted mb-0">Mean percentage on each student's latest attempt</p>[m
+[32m+[m[32m                </article>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m            <div class="col-sm-6 col-xl-3">[m
+[32m+[m[32m                <article class="faculty-analysis__filter-bar h-100 p-3 p-md-4">[m
+[32m+[m[32m                    <div class="small text-uppercase text-muted fw-bold mb-1">Flagged for review</div>[m
+[32m+[m[32m                    <div class="h3 fw-bold mb-1 font-monospace">{{ $summary['questions_to_review'] }}</div>[m
+[32m+[m[32m                    <p class="small text-muted mb-0">Questions with at least 50% incorrect responses</p>[m
+[32m+[m[32m                </article>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m            <div class="col-sm-6 col-xl-3">[m
+[32m+[m[32m                <article class="faculty-analysis__filter-bar h-100 p-3 p-md-4">[m
+[32m+[m[32m                    <div class="small text-uppercase text-muted fw-bold mb-1">Questions</div>[m
+[32m+[m[32m                    <div class="h3 fw-bold mb-1 font-monospace">{{ $summary['question_count'] }}</div>[m
+[32m+[m[32m                    <p class="small text-muted mb-0">Items included in this examination</p>[m
+[32m+[m[32m                </article>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m        </section>[m
+[32m+[m
+[32m+[m[32m        <section class="faculty-analysis__filter-bar d-flex flex-wrap justify-content-between align-items-center gap-3 p-3 p-md-4 mb-3">[m
+             <span class="badge rounded-pill text-bg-light border mb-2">{{ $selectedTest->scheduleStatus() }} · {{ $selectedTest->results_count }} result(s)</span>[m
+[31m-            <h2 class="h4 fw-bold mb-1">{{ $selectedTest->title }}</h2>[m
+[31m-            <p class="small text-muted mb-0"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>Results are calculated from each student's latest submitted attempt. Existing responses without question identifiers are matched by question text.</p>[m
+[32m+[m[32m            <div class="d-flex flex-wrap align-items-center gap-2">[m
+[32m+[m[32m                <a class="btn btn-outline-primary" href="{{ route('admin.question-bank.index', ['course_id' => $selectedTest->course_id]) }}">[m
+[32m+[m[32m                    <i class="bi bi-journal-text me-1" aria-hidden="true"></i>Open Question Bank[m
+[32m+[m[32m                </a>[m
+[32m+[m[32m                <a class="btn btn-primary" href="{{ route('admin.item-analysis.export', ['test_id' => $selectedTest->id]) }}">[m
+[32m+[m[32m                    <i class="bi bi-download me-1" aria-hidden="true"></i>Export CSV[m
+[32m+[m[32m                </a>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m            <div class="w-100">[m
+[32m+[m[32m                <h2 class="h4 fw-bold mb-1">{{ $selectedTest->title }}</h2>[m
+[32m+[m[32m                <p class="small text-muted mb-0"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>Analysis uses each student's latest submitted attempt. Only answers recorded for an item are included in its response totals.</p>[m
+[32m+[m[32m            </div>[m
+         </section>[m
+         <div class="faculty-analysis__table-wrap">[m
+             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 px-md-4 py-3 border-bottom">[m
+                 <div>[m
+                     <h3 class="h5 fw-bold mb-1">Question performance</h3>[m
+[31m-                    <p class="small text-muted mb-0">Open each question for review; questions with a high incorrect rate are flagged.</p>[m
+[32m+[m[32m                    <p class="small text-muted mb-0">A high miss rate is a review signal, not proof that a question is flawed.</p>[m
+                 </div>[m
+[31m-                <span class="badge rounded-pill text-bg-light border px-3 py-2">{{ count($analysis) }} questions</span>[m
+[32m+[m[32m                <span class="badge rounded-pill text-bg-light border px-3 py-2">{{ count($analysis) }} of {{ $summary['question_count'] }} questions</span>[m
+             </div>[m
+[32m+[m[32m            <form method="GET" action="{{ route('admin.item-analysis.index') }}" class="p-3 p-md-4 border-bottom">[m
+[32m+[m[32m                <input type="hidden" name="test_id" value="{{ $selectedTest->id }}">[m
+[32m+[m[32m                <div class="row g-2 align-items-end">[m
+[32m+[m[32m                    <div class="col-12 col-md-4">[m
+[32m+[m[32m                        <label class="form-label small fw-semibold" for="analysis-search">Search questions</label>[m
+[32m+[m[32m                        <input class="form-control" id="analysis-search" name="search" type="search" value="{{ $filters['search'] }}" placeholder="Question or topic">[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                    <div class="col-12 col-sm-6 col-md-3">[m
+[32m+[m[32m                        <label class="form-label small fw-semibold" for="analysis-topic">Topic</label>[m
+[32m+[m[32m                        <select class="form-select" id="analysis-topic" name="topic">[m
+[32m+[m[32m                            <option value="">All topics</option>[m
+[32m+[m[32m                            @foreach ($topics as $topic)[m
+[32m+[m[32m                                <option value="{{ $topic }}" @selected($filters['topic'] === $topic)>{{ $topic }}</option>[m
+[32m+[m[32m                            @endforeach[m
+[32m+[m[32m                        </select>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                    <div class="col-12 col-sm-6 col-md-2">[m
+[32m+[m[32m                        <label class="form-label small fw-semibold" for="analysis-review">Review status</label>[m
+[32m+[m[32m                        <select class="form-select" id="analysis-review" name="review">[m
+[32m+[m[32m                            <option value="all" @selected($filters['review'] === 'all')>All questions</option>[m
+[32m+[m[32m                            <option value="needs-review" @selected($filters['review'] === 'needs-review')>Flagged only</option>[m
+[32m+[m[32m                        </select>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                    <div class="col-12 col-sm-6 col-md-2">[m
+[32m+[m[32m                        <label class="form-label small fw-semibold" for="analysis-sort">Sort by</label>[m
+[32m+[m[32m                        <select class="form-select" id="analysis-sort" name="sort">[m
+[32m+[m[32m                            <option value="default" @selected($filters['sort'] === 'default')>Question order</option>[m
+[32m+[m[32m                            <option value="most-missed" @selected($filters['sort'] === 'most-missed')>Most missed</option>[m
+[32m+[m[32m                            <option value="fewest-responses" @selected($filters['sort'] === 'fewest-responses')>Fewest responses</option>[m
+[32m+[m[32m                        </select>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                    <div class="col-12 col-sm-6 col-md-1 d-grid">[m
+[32m+[m[32m                        <button class="btn btn-primary" type="submit">Apply</button>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                </div>[m
+[32m+[m[32m                @if ($filters['search'] !== '' || $filters['topic'] !== '' || $filters['review'] !== 'all' || $filters['sort'] !== 'default')[m
+[32m+[m[32m                    <a class="small d-inline-block mt-2" href="{{ route('admin.item-analysis.index', ['test_id' => $selectedTest->id]) }}">Clear filters</a>[m
+[32m+[m[32m                @endif[m
+[32m+[m[32m            </form>[m
+             <div class="table-responsive">[m
+                 <table class="table table-hover align-middle mb-0 faculty-analysis__table">[m
+                     <thead class="table-light">[m
+[31m-                        <tr><th scope="col">Question</th><th scope="col">Topic</th><th scope="col">Students answered</th><th scope="col">Correct</th><th scope="col">Incorrect</th><th scope="col">Review</th></tr>[m
+[32m+[m[32m                        <tr><th scope="col">Question</th><th scope="col">Topic</th><th scope="col">Responses recorded</th><th scope="col">Correct</th><th scope="col">Incorrect</th><th scope="col">Review</th></tr>[m
+                     </thead>[m
+                     <tbody>[m
+                         @forelse ($analysis as $row)[m
+                             <tr class="{{ $row['is_difficult'] ? 'is-difficult' : '' }}">[m
+                                 <td data-label="Question" class="faculty-analysis__question fw-semibold">{{ $row['question'] }}</td>[m
+                                 <td data-label="Topic">{{ $row['topic'] ?: '—' }}</td>[m
+[31m-                                <td data-label="Students answered"><span class="fw-semibold">{{ $row['total'] }}</span></td>[m
+[32m+[m[32m                                <td data-label="Responses recorded"><span class="fw-semibold">{{ $row['total'] }}</span></td>[m
+                                 <td data-label="Correct"><span class="text-success fw-bold">{{ $row['correct'] }}</span><span class="faculty-analysis__percent"> ({{ $row['correct_percentage'] }}%)</span></td>[m
+                                 <td data-label="Incorrect"><span class="text-danger fw-bold">{{ $row['incorrect'] }}</span><span class="faculty-analysis__percent"> ({{ $row['incorrect_percentage'] }}%)</span></td>[m
+                                 <td data-label="Review">[m
+[36m@@ -427,9 +521,30 @@[m
+                                                         <h3 class="h6 fw-semibold text-dark mb-3">{{ $row['question'] }}</h3>[m
+                                                         <div class="alert alert-warning">[m
+                                                             <strong class="d-block mb-1">Latest student attempts</strong>[m
+[31m-                                                            Across {{ $row['total'] }} attempts: <strong>{{ $row['correct'] }} correct</strong> and <strong>{{ $row['incorrect'] }} incorrect</strong> ({{ $row['incorrect_percentage'] }}% incorrect).[m
+[32m+[m[32m                                                            Among {{ $row['total'] }} recorded responses: <strong>{{ $row['correct'] }} correct</strong> and <strong>{{ $row['incorrect'] }} incorrect</strong> ({{ $row['incorrect_percentage'] }}% incorrect).[m
+                                                             The highlighted choice is the answer key, not an individual student's response.[m
+[32m+[m[32m                                                            Interpret patterns in context, especially when only a few students responded.[m
+                                                         </div>[m
+[32m+[m[32m                                                        @if ($row['most_selected_distractor'])[m
+[32m+[m[32m                                                            <section class="border rounded-3 bg-light p-3 mb-3">[m
+[32m+[m[32m                                                                <h4 class="small fw-bold mb-1">Teaching insight</h4>[m
+[32m+[m[32m                                                                <p class="small mb-0">[m
+[32m+[m[32m                                                                    Most selected incorrect answer:[m
+[32m+[m[32m                                                                    <strong>{{ $row['most_selected_distractor']['label'] }}</strong>[m
+[32m+[m[32m                                                                    ({{ $row['most_selected_distractor']['count'] }} of {{ $row['total'] }} responses).[m
+[32m+[m[32m                                                                    @if ($row['topic'])[m
+[32m+[m[32m                                                                        Consider reviewing <strong>{{ $row['topic'] }}</strong> with the class; this pattern may point to a misconception.[m
+[32m+[m[32m                                                                    @else[m
+[32m+[m[32m                                                                        Consider reviewing this concept with the class; this pattern may point to a misconception.[m
+[32m+[m[32m                                                                    @endif[m
+[32m+[m[32m                                                                </p>[m
+[32m+[m[32m                                                            </section>[m
+[32m+[m[32m                                                        @elseif ($row['is_difficult'])[m
+[32m+[m[32m                                                            <section class="border rounded-3 bg-light p-3 mb-3">[m
+[32m+[m[32m                                                                <h4 class="small fw-bold mb-1">Teaching follow-up</h4>[m
+[32m+[m[32m                                                                <p class="small mb-0">Consider revisiting this question's concept with the class. The high miss rate is a prompt to investigate, not a judgment that the item is defective.</p>[m
+[32m+[m[32m                                                            </section>[m
+[32m+[m[32m                                                        @endif[m
+                                                         @if ($row['total'] > 0)[m
+                                                             @php[m
+                                                                 $responseColors = ['#4f46e5', '#059669', '#d97706', '#e11d48', '#0891b2', '#64748b'];[m
+[36m@@ -483,6 +598,49 @@[m [mclass="analysis-response-pie"[m
+                                                         @elseif ($row['options'] === [] && ! $row['correct_answer'])[m
+                                                             <p class="small text-muted mb-0">Question choices and answer details are unavailable for this item.</p>[m
+                                                         @endif[m
+[32m+[m[32m                                                        <section class="mt-4">[m
+[32m+[m[32m                                                            <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-2">[m
+[32m+[m[32m                                                                <h4 class="h6 fw-bold mb-0">Individual student responses</h4>[m
+[32m+[m[32m                                                                <span class="small text-muted">Recorded answers from each student's latest submitted attempt</span>[m
+[32m+[m[32m                                                            </div>[m
+[32m+[m[32m                                                            @if ($row['student_responses'] !== [])[m
+[32m+[m[32m                                                                <div class="table-responsive border rounded-3">[m
+[32m+[m[32m                                                                    <table class="table table-sm table-hover align-middle mb-0 faculty-analysis__student-table">[m
+[32m+[m[32m                                                                        <thead>[m
+[32m+[m[32m                                                                            <tr><th scope="col">Student</th><th scope="col">Selected answer</th><th scope="col">Result</th></tr>[m
+[32m+[m[32m                                                                        </thead>[m
+[32m+[m[32m                                                                        <tbody>[m
+[32m+[m[32m                                                                            @foreach ($row['student_responses'] as $studentResponse)[m
+[32m+[m[32m                                                                                <tr>[m
+[32m+[m[32m                                                                                    <td>{{ $studentResponse['student_name'] }}</td>[m
+[32m+[m[32m                                                                                    <td>{{ $studentResponse['answer'] }}</td>[m
+[32m+[m[32m                                                                                    <td>[m
+[32m+[m[32m                                                                                        @if ($studentResponse['is_correct'])[m
+[32m+[m[32m                                                                                            <span class="badge text-bg-success">Correct</span>[m
+[32m+[m[32m                                                                                        @else[m
+[32m+[m[32m                                                                                            <span class="badge text-bg-danger">{{ $studentResponse['answer'] === 'Unanswered' ? 'Unanswered' : 'Incorrect' }}</span>[m
+[32m+[m[32m                                                                                        @endif[m
+[32m+[m[32m                                                                                    </td>[m
+[32m+[m[32m                                                                                </tr>[m
+[32m+[m[32m                                                                            @endforeach[m
+[32m+[m[32m                                                                        </tbody>[m
+[32m+[m[32m                                                                    </table>[m
+[32m+[m[32m                                                                </div>[m
+[32m+[m[32m                                                            @else[m
+[32m+[m[32m                                                                <p class="small text-muted mb-0">No student responses are recorded for this question.</p>[m
+[32m+[m[32m                                                            @endif[m
+[32m+[m[32m                                                        </section>[m
+[32m+[m[32m                                                        <div class="mt-3">[m
+[32m+[m[32m                                                            @if ($selectedTest->course_id && $row['topic_id'])[m
+[32m+[m[32m                                                                <a class="btn btn-outline-primary btn-sm" href="{{ route('admin.question-bank.index', ['course_id' => $selectedTest->course_id, 'topic_id' => $row['topic_id']]) }}">[m
+[32m+[m[32m                                                                    <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Review related Question Bank topic[m
+[32m+[m[32m                                                                </a>[m
+[32m+[m[32m                                                            @else[m
+[32m+[m[32m                                                                <a class="btn btn-outline-primary btn-sm" href="{{ route('admin.question-bank.index', ['course_id' => $selectedTest->course_id]) }}">[m
+[32m+[m[32m                                                                    <i class="bi bi-journal-text me-1" aria-hidden="true"></i>Open Question Bank[m
+[32m+[m[32m                                                                </a>[m
+[32m+[m[32m                                                            @endif[m
+[32m+[m[32m                                                        </div>[m
+                                                     </div>[m
+                                                     <div class="modal-footer">[m
+                                                         <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Close</button>[m
+[1mdiff --git a/routes/web.php b/routes/web.php[m
+[1mindex 5766253..f609f7d 100644[m
+[1m--- a/routes/web.php[m
+[1m+++ b/routes/web.php[m
+[36m@@ -229,6 +229,7 @@[m
+     Route::put('/question-bank/{questionBankItem}', [QuestionBankController::class, 'update'])->name('question-bank.update');[m
+     Route::delete('/question-bank/{questionBankItem}', [QuestionBankController::class, 'destroy'])->name('question-bank.destroy');[m
+     Route::get('/item-analysis', [ItemAnalysisController::class, 'facultyIndex'])->name('item-analysis.index');[m
+[32m+[m[32m    Route::get('/item-analysis/export', [ItemAnalysisController::class, 'exportFaculty'])->name('item-analysis.export');[m
+ [m
+     // Module Management[m
+     Route::get('/modules', [ModuleController::class, 'index'])->name('modules.index');[m
+[1mdiff --git a/tests/Feature/ItemAnalysisControllerTest.php b/tests/Feature/ItemAnalysisControllerTest.php[m
+[1mindex 682c14e..0521e77 100644[m
+[1m--- a/tests/Feature/ItemAnalysisControllerTest.php[m
+[1m+++ b/tests/Feature/ItemAnalysisControllerTest.php[m
+[36m@@ -42,16 +42,19 @@[m [mpublic function test_faculty_item_analysis_counts_each_students_latest_response_[m
+             'course_id' => $course->id,[m
+         ]);[m
+         $firstStudent = User::factory()->create([[m
+[32m+[m[32m            'name' => 'Student One',[m
+             'role' => 'student',[m
+             'department_id' => $department->id,[m
+             'course_id' => $course->id,[m
+         ]);[m
+         $secondStudent = User::factory()->create([[m
+[32m+[m[32m            'name' => 'Student Two',[m
+             'role' => 'student',[m
+             'department_id' => $department->id,[m
+             'course_id' => $course->id,[m
+         ]);[m
+         $legacyStudent = User::factory()->create([[m
+[32m+[m[32m            'name' => 'Student Legacy',[m
+             'role' => 'student',[m
+             'department_id' => $department->id,[m
+             'course_id' => $course->id,[m
+[36m@@ -158,14 +161,34 @@[m [mpublic function test_faculty_item_analysis_counts_each_students_latest_response_[m
+             ->assertSee('2 incorrect')[m
+             ->assertSee('The highlighted choice is the answer key')[m
+             ->assertSee('HTTPS encrypts web traffic.')[m
+[32m+[m[32m            ->assertSee('Individual student responses')[m
+[32m+[m[32m            ->assertSee('Student One')[m
+[32m+[m[32m            ->assertSee('Student Two')[m
+[32m+[m[32m            ->assertSee('Student Legacy')[m
+[32m+[m[32m            ->assertSee('Export CSV')[m
+[32m+[m[32m            ->assertSee('Most missed')[m
+             ->assertSee('data-bs-target="#facultyQuestionReview2"', false)[m
+             ->assertSee('id="facultyQuestionReview2"', false);[m
+ [m
+         $analysis = collect($response->viewData('analysis'))->keyBy('question');[m
+[32m+[m[32m        $summary = $response->viewData('summary');[m
+[32m+[m[32m        $this->assertSame(3, $summary['participants']);[m
+[32m+[m[32m        $this->assertSame(3, $summary['eligible_students']);[m
+[32m+[m[32m        $this->assertSame(100, $summary['completion_percentage']);[m
+[32m+[m[32m        $this->assertSame(17, $summary['average_score_percentage']);[m
+[32m+[m[32m        $this->assertSame(2, $summary['questions_to_review']);[m
+         $this->assertSame(3, $analysis[$firstQuestion->question]['total']);[m
+         $this->assertSame(1, $analysis[$firstQuestion->question]['correct']);[m
+         $this->assertSame(2, $analysis[$firstQuestion->question]['incorrect']);[m
+         $this->assertSame(67, $analysis[$firstQuestion->question]['incorrect_percentage']);[m
+[32m+[m[32m        $this->assertSame([m
+[32m+[m[32m            [[m
+[32m+[m[32m                ['student_name' => 'Student Legacy', 'answer' => 'Unanswered', 'is_correct' => false],[m
+[32m+[m[32m                ['student_name' => 'Student One', 'answer' => 'HTTPS', 'is_correct' => true],[m
+[32m+[m[32m                ['student_name' => 'Student Two', 'answer' => 'FTP', 'is_correct' => false],[m
+[32m+[m[32m            ],[m
+[32m+[m[32m            $analysis[$firstQuestion->question]['student_responses'],[m
+[32m+[m[32m        );[m
+         $this->assertSame([[m
+             ['label' => 'HTTPS', 'count' => 1, 'percentage' => 33, 'is_correct' => true],[m
+             ['label' => 'FTP', 'count' => 1, 'percentage' => 33, 'is_correct' => false],[m
+[36m@@ -179,6 +202,19 @@[m [mpublic function test_faculty_item_analysis_counts_each_students_latest_response_[m
+         $this->assertTrue($analysis[$secondQuestion->question]['is_difficult']);[m
+         $this->assertSame(2, $analysis[$thirdQuestion->question]['correct']);[m
+         $this->assertFalse($analysis[$thirdQuestion->question]['is_difficult']);[m
+[32m+[m
+[32m+[m[32m        $filteredResponse = $this->actingAs($faculty)[m
+[32m+[m[32m            ->get(route('admin.item-analysis.index', [[m
+[32m+[m[32m                'test_id' => $exam->id,[m
+[32m+[m[32m                'search' => 'protocol',[m
+[32m+[m[32m                'review' => 'needs-review',[m
+[32m+[m[32m                'sort' => 'most-missed',[m
+[32m+[m[32m            ]));[m
+[32m+[m
+[32m+[m[32m        $this->assertSame([m
+[32m+[m[32m            [$secondQuestion->question, $firstQuestion->question],[m
+[32m+[m[32m            array_column($filteredResponse->viewData('analysis'), 'question'),[m
+[32m+[m[32m        );[m
+     }[m
+ [m
+     public function test_item_analysis_matches_historical_responses_without_question_ids_by_text(): void[m
+[36m@@ -236,6 +272,58 @@[m [mpublic function test_faculty_cannot_analyze_another_programs_exam(): void[m
+         $this->actingAs($faculty)[m
+             ->get(route('admin.item-analysis.index', ['test_id' => $exam->id]))[m
+             ->assertNotFound();[m
+[32m+[m
+[32m+[m[32m        $this->actingAs($faculty)[m
+[32m+[m[32m            ->get(route('admin.item-analysis.export', ['test_id' => $exam->id]))[m
+[32m+[m[32m            ->assertNotFound();[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    public function test_faculty_can_export_a_safe_question_level_csv_for_their_exam(): void[m
+[32m+[m[32m    {[m
+[32m+[m[32m        [$department, $course] = $this->createProgram('Computing', 'COMP', 'Software Engineering', 'SE');[m
+[32m+[m[32m        $faculty = User::factory()->create([[m
+[32m+[m[32m            'role' => 'admin',[m
+[32m+[m[32m            'department_id' => $department->id,[m
+[32m+[m[32m            'course_id' => $course->id,[m
+[32m+[m[32m        ]);[m
+[32m+[m[32m        $student = User::factory()->create([[m
+[32m+[m[32m            'name' => 'Student Export',[m
+[32m+[m[32m            'role' => 'student',[m
+[32m+[m[32m            'department_id' => $department->id,[m
+[32m+[m[32m            'course_id' => $course->id,[m
+[32m+[m[32m        ]);[m
+[32m+[m[32m        $exam = $this->createExam($department->id, $course->id);[m
+[32m+[m[32m        $question = Question::create([[m
+[32m+[m[32m            'test_id' => $exam->id,[m
+[32m+[m[32m            'question' => '=HYPERLINK("https://example.com")',[m
+[32m+[m[32m            'options' => ['HTTPS', 'FTP'],[m
+[32m+[m[32m            'correct_answer' => 'HTTPS',[m
+[32m+[m[32m            'topic' => 'Network security',[m
+[32m+[m[32m        ]);[m
+[32m+[m[32m        Result::create([[m
+[32m+[m[32m            'user_id' => $student->id,[m
+[32m+[m[32m            'test_id' => $exam->id,[m
+[32m+[m[32m            'score' => 0,[m
+[32m+[m[32m            'total_questions' => 1,[m
+[32m+[m[32m            'answers' => [[[m
+[32m+[m[32m                'question_id' => $question->id,[m
+[32m+[m[32m                'question_text' => $question->question,[m
+[32m+[m[32m                'options' => $question->options,[m
+[32m+[m[32m                'correct_answer' => $question->correct_answer,[m
+[32m+[m[32m                'user_answer' => 'FTP',[m
+[32m+[m[32m                'is_correct' => false,[m
+[32m+[m[32m            ]],[m
+[32m+[m[32m        ]);[m
+[32m+[m
+[32m+[m[32m        $response = $this->actingAs($faculty)[m
+[32m+[m[32m            ->get(route('admin.item-analysis.export', ['test_id' => $exam->id]));[m
+[32m+[m
+[32m+[m[32m        $response->assertStreamed()[m
+[32m+[m[32m            ->assertHeader('Content-Type', 'text/csv; charset=UTF-8');[m
+[32m+[m[32m        $this->assertStringContainsString("'=HYPERLINK", $response->streamedContent());[m
+[32m+[m[32m        $this->assertStringContainsString('Network security', $response->streamedContent());[m
+[32m+[m[32m        $this->assertStringContainsString('Needs review', $response->streamedContent());[m
+[32m+[m[32m        $this->assertStringNotContainsString('Student Export', $response->streamedContent());[m
+     }[m
+ [m
+     public function test_admin_can_inspect_item_analysis_across_programs(): void[m
