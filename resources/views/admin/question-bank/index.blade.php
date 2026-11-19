@@ -445,11 +445,11 @@
             </div>
         </div>
         @if ($showTopicPage && ! $readOnly)
-            <a href="{{ route('admin.question-bank.index', ['course_id' => $course->id]) }}" class="btn btn-light rounded-pill px-4">
+            <a href="{{ route('admin.question-bank.index', ['course_id' => $course->id, 'faculty_id' => $selectedFacultyId]) }}" class="btn btn-light rounded-pill px-4">
                 <i class="bi bi-arrow-left me-1" aria-hidden="true"></i> Back to Topics
             </a>
         @elseif ($showTopicPage)
-            <a href="{{ route('super-admin.question-bank.index', ['department_id' => $selectedDepartmentId, 'course_id' => $course->id]) }}" class="btn btn-light rounded-pill px-4">
+            <a href="{{ route('super-admin.question-bank.index', ['department_id' => $selectedDepartmentId, 'course_id' => $course->id, 'faculty_id' => $selectedFacultyId]) }}" class="btn btn-light rounded-pill px-4">
                 <i class="bi bi-arrow-left me-1" aria-hidden="true"></i> Back to Topics
             </a>
         @endif
@@ -464,10 +464,11 @@
                     @if ($readOnly)
                         <div>
                             <span class="faculty-question-bank__eyebrow text-primary">Academic oversight</span>
-                            <h2 class="h5 fw-bold mb-1">Filter by college and program</h2>
+                            <h2 class="h5 fw-bold mb-1">Filter by college, program, and faculty</h2>
                             <p class="small text-muted mb-0">
                                 {{ $departments->firstWhere('id', $selectedDepartmentId)?->name ?? 'All colleges' }}
                                 · {{ $course?->name ?? 'All programs' }}
+                                · {{ $selectedFaculty?->name ?? 'All faculty' }}
                             </p>
                         </div>
                         <button
@@ -476,17 +477,17 @@
                             data-bs-toggle="modal"
                             data-bs-target="#questionBankFilterModal"
                             data-question-bank-filter-trigger
-                            aria-label="Filter by college and program"
+                            aria-label="Filter by college, program, and faculty"
                             aria-controls="questionBankFilterModal"
                             aria-expanded="false"
-                            title="Filter by college and program"
+                            title="Filter by college, program, and faculty"
                         >
                             <i class="bi bi-funnel" aria-hidden="true"></i>
                         </button>
                     @else
                         <div>
                             <span class="faculty-question-bank__eyebrow text-primary">Your collection</span>
-                            <h2 class="h5 fw-bold mb-1">Filter by program</h2>
+                            <h2 class="h5 fw-bold mb-1">Filter by program and faculty</h2>
                             <p class="small text-muted mb-0">Browse shared folders and manage your own questions.</p>
                         </div>
                         <form method="GET" action="{{ route('admin.question-bank.index') }}" class="d-flex flex-wrap align-items-center gap-2 faculty-question-bank__filter">
@@ -495,6 +496,17 @@
                                 <option value="">All my programs</option>
                                 @foreach($courses as $availableCourse)
                                     <option value="{{ $availableCourse->id }}" @selected($selectedCourseId === $availableCourse->id)>{{ $availableCourse->name }}</option>
+                                @endforeach
+                            </select>
+                            <label class="visually-hidden" for="faculty-question-faculty">Faculty filter</label>
+                            <select class="form-select form-select-lg" id="faculty-question-faculty" name="faculty_id"
+                                    @disabled($selectedCourseId === null)
+                                    onchange="this.form.submit()">
+                                <option value="">All faculty</option>
+                                @foreach($filterFaculty as $availableFaculty)
+                                    <option value="{{ $availableFaculty->id }}" @selected($selectedFacultyId === $availableFaculty->id)>
+                                        {{ $availableFaculty->name }}
+                                    </option>
                                 @endforeach
                             </select>
                             @if ($course !== null)
@@ -516,7 +528,7 @@
                                     <div>
                                         <span class="faculty-question-bank__eyebrow text-primary">Refine your results</span>
                                         <h2 class="modal-title h4 fw-bold mt-1 mb-1" id="question-bank-filter-heading">Filter Question Bank</h2>
-                                        <p class="small text-muted mb-0">Choose a college, then a program. Results update when you apply the filter.</p>
+                                        <p class="small text-muted mb-0">Choose a college and program. Faculty is optional; leave it blank to view all contributors.</p>
                                     </div>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                 </div>
@@ -552,6 +564,25 @@
                                                     @selected($selectedCourseId === $availableCourse->id)
                                                     @if($availableCourse->department_id !== $selectedDepartmentId) hidden @endif
                                                 >{{ $availableCourse->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="question-bank-faculty" class="form-label fw-semibold">Faculty <span class="text-muted fw-normal">(optional)</span></label>
+                                        <select
+                                            class="form-select"
+                                            id="question-bank-faculty"
+                                            name="faculty_id"
+                                            aria-label="Filter by faculty"
+                                            @disabled($selectedCourseId === null)
+                                        >
+                                            <option value="">All faculty</option>
+                                            @foreach($filterFaculty as $availableFaculty)
+                                                <option
+                                                    value="{{ $availableFaculty->id }}"
+                                                    data-department-id="{{ $selectedDepartmentId }}"
+                                                    @selected($selectedFacultyId === $availableFaculty->id)
+                                                >{{ $availableFaculty->name }}</option>
                                             @endforeach
                                         </select>
                                     </div>
@@ -592,8 +623,8 @@
                         <a
                             class="faculty-question-bank__topic-card faculty-question-bank__topic-card-link"
                             href="{{ $readOnly
-                                ? route('super-admin.question-bank.index', ['department_id' => $selectedDepartmentId, 'course_id' => $course->id, 'topic_id' => $topic->id])
-                                : route('admin.question-bank.topics.show', $topic) }}"
+                                ? route('super-admin.question-bank.index', ['department_id' => $selectedDepartmentId, 'course_id' => $course->id, 'faculty_id' => $selectedFacultyId, 'topic_id' => $topic->id])
+                                : route('admin.question-bank.topics.show', array_filter(['topic' => $topic, 'faculty_id' => $selectedFacultyId])) }}"
                             aria-label="Open {{ $topic->name }} topic folder"
                         >
                             <span class="d-flex align-items-center justify-content-between gap-3">
@@ -785,14 +816,22 @@
         <div class="faculty-question-bank__section-heading mb-3">
             <div>
                 <span class="faculty-question-bank__eyebrow text-primary">Question collection</span>
-                <h2 class="h3 fw-bold mb-1" id="bank-items-heading">{{ $selectedTopic?->name ?? ($course?->name ?? 'My questions') }}</h2>
+                <h2 class="h3 fw-bold mb-1" id="bank-items-heading">
+                    {{ $selectedTopic?->name ?? ('Questions by '.$selectedFaculty?->name) }}
+                </h2>
                 <p class="small text-muted mb-0">
-                    {{ $readOnly ? 'Questions are shared across Faculty in this program. Disabled questions cannot be added to future exams.' : 'Questions are shared across Faculty in this program. You can edit or remove only questions you created.' }}
+                    @if ($selectedFaculty !== null)
+                        Showing questions added by {{ $selectedFaculty->name }} in {{ $course->name }}.
+                    @else
+                        {{ $readOnly ? 'Questions are shared across Faculty in this program. Disabled questions cannot be added to future exams.' : 'Questions are shared across Faculty in this program. You can edit or remove only questions you created.' }}
+                    @endif
                 </p>
             </div>
             <div class="d-flex flex-wrap align-items-center gap-2">
-                @if ($selectedTopic !== null)
+                @if ($selectedTopic !== null || $selectedFaculty !== null)
                     <span class="badge rounded-pill text-bg-light border px-3 py-2">{{ $items->total() }} total</span>
+                @endif
+                @if ($selectedTopic !== null)
                     <div class="dropdown">
                         <button
                             class="btn btn-outline-secondary rounded-pill px-3"
@@ -814,6 +853,7 @@
                                         array_filter([
                                             'department_id' => $readOnly ? $selectedDepartmentId : null,
                                             'course_id' => $readOnly ? $course->id : null,
+                                            'faculty_id' => $selectedFacultyId,
                                             'topic_id' => $readOnly ? $selectedTopic->id : null,
                                             'topic' => $readOnly ? null : $selectedTopic->id,
                                             'health' => $selectedHealth === 'all' ? null : $selectedHealth,
@@ -830,6 +870,7 @@
                                             array_filter([
                                                 'department_id' => $readOnly ? $selectedDepartmentId : null,
                                                 'course_id' => $readOnly ? $course->id : null,
+                                                'faculty_id' => $selectedFacultyId,
                                                 'topic_id' => $readOnly ? $selectedTopic->id : null,
                                                 'topic' => $readOnly ? null : $selectedTopic->id,
                                                 'difficulty' => $value,
@@ -881,6 +922,7 @@
                                             array_filter([
                                                 'department_id' => $readOnly ? $selectedDepartmentId : null,
                                                 'course_id' => $readOnly ? $course->id : null,
+                                                'faculty_id' => $selectedFacultyId,
                                                 'topic_id' => $readOnly ? $selectedTopic->id : null,
                                                 'topic' => $readOnly ? null : $selectedTopic->id,
                                                 'difficulty' => $selectedDifficulty,
@@ -936,7 +978,7 @@
                     <div class="d-flex align-items-start gap-3">
                         <span class="faculty-question-bank__question-number" aria-hidden="true"><i class="bi bi-patch-question"></i></span>
                         <div>
-                            <span class="badge rounded-pill text-bg-light mb-2">{{ $selectedTopic->name }}</span>
+                            <span class="badge rounded-pill text-bg-light mb-2">{{ $selectedTopic?->name ?? $item->topicRecord?->name ?? 'Unfiled' }}</span>
                             <div class="small text-muted mb-1">Added by: {{ $item->author?->name ?: 'Faculty' }}</div>
                             <span class="badge rounded-pill {{ $item->difficulty === 'hard' ? 'text-bg-danger' : ($item->difficulty === 'easy' ? 'text-bg-success' : 'text-bg-warning') }} mb-2">{{ $item->difficulty === 'medium' ? 'Moderate' : ucfirst($item->difficulty ?? 'moderate') }}</span>
                             <span
@@ -1266,7 +1308,11 @@
                 <span class="faculty-question-bank__question-number mb-3"><i class="bi bi-journal-plus" aria-hidden="true"></i></span>
                 <h3 class="h5 fw-bold">No questions in this topic yet</h3>
                 <p class="text-muted mb-0">
-                    {{ $readOnly ? 'No questions are stored in this shared folder yet.' : 'Add the first question to '.$selectedTopic->name.'.' }}
+                    @if ($selectedFaculty !== null)
+                        No questions by {{ $selectedFaculty->name }} were found in this program.
+                    @else
+                        {{ $readOnly ? 'No questions are stored in this shared folder yet.' : 'Add the first question to '.$selectedTopic->name.'.' }}
+                    @endif
                 </p>
             </div>
         @endforelse
@@ -1302,9 +1348,12 @@
         const filterTrigger = document.querySelector('[data-question-bank-filter-trigger]');
         const departmentFilter = document.getElementById('question-bank-department');
         const programFilter = document.getElementById('question-bank-course');
+        const facultyFilter = document.getElementById('question-bank-faculty');
 
-        if (filterModal && filterTrigger && departmentFilter && programFilter) {
+        if (filterModal && filterTrigger && departmentFilter && programFilter && facultyFilter) {
             const programOptions = Array.from(programFilter.options)
+                .filter((option) => option.dataset.departmentId);
+            const facultyOptions = Array.from(facultyFilter.options)
                 .filter((option) => option.dataset.departmentId);
             const programPlaceholder = programFilter.querySelector('option[value=""]');
             const updateProgramOptions = (resetProgram = false) => {
@@ -1325,10 +1374,32 @@
                 programPlaceholder.textContent = departmentId ? 'Select a program' : 'Select a college first';
             };
 
-            departmentFilter.addEventListener('change', () => updateProgramOptions(true));
+            const updateFacultyOptions = (resetFaculty = false) => {
+                const departmentId = departmentFilter.value;
+
+                facultyOptions.forEach((option) => {
+                    option.hidden = option.dataset.departmentId !== departmentId;
+                });
+
+                if (resetFaculty || (
+                    facultyFilter.value !== ''
+                    && facultyFilter.selectedOptions[0]?.dataset.departmentId !== departmentId
+                )) {
+                    facultyFilter.value = '';
+                }
+
+                facultyFilter.disabled = departmentId === '' || programFilter.value === '';
+            };
+
+            departmentFilter.addEventListener('change', () => {
+                updateProgramOptions(true);
+                updateFacultyOptions(true);
+            });
+            programFilter.addEventListener('change', () => updateFacultyOptions());
             filterModal.addEventListener('shown.bs.modal', () => filterTrigger.setAttribute('aria-expanded', 'true'));
             filterModal.addEventListener('hidden.bs.modal', () => filterTrigger.setAttribute('aria-expanded', 'false'));
             updateProgramOptions();
+            updateFacultyOptions();
         }
 
         document.querySelectorAll('[data-question-image-preview]').forEach((input) => {

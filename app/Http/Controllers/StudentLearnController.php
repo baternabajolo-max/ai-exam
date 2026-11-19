@@ -10,6 +10,7 @@ use App\Models\StudySession;
 use App\Models\Subtopic;
 use App\Models\Test;
 use App\Services\AiService;
+use App\Services\PdfTextExtractor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -54,11 +55,11 @@ class StudentLearnController extends Controller
         return view('student.learn.show', compact('module'));
     }
 
-    public function review(Subtopic $subtopic)
+    public function review(Subtopic $subtopic, PdfTextExtractor $extractor)
     {
         $subtopic->load('module');
         $this->ensureModuleBelongsToAuthenticatedStudent($subtopic->module);
-        $this->queuePendingPdfExtraction($subtopic);
+        $this->extractPdfTextForReview($subtopic, $extractor);
         $subtopic->refresh();
 
         $isPdf = $this->isPdf($subtopic->file_path);
@@ -273,6 +274,69 @@ class StudentLearnController extends Controller
             Module::forStudent(auth()->user())->whereKey($module->getKey())->exists(),
             404,
         );
+    }
+
+    private function extractPdfTextForReview(Subtopic $subtopic, PdfTextExtractor $extractor): void
+    {
+        $filePath = $subtopic->file_path;
+        if (! $this->isPdf($filePath)
+            || ! $filePath
+            || $subtopic->text_extraction_status === Subtopic::TEXT_EXTRACTION_COMPLETED) {
+            return;
+        }
+
+        if (! Storage::disk('public')->exists($filePath)) {
+            Subtopic::query()
+                ->whereKey($subtopic->id)
+                ->where('file_path', $filePath)
+                ->update([
+                    'extracted_text' => null,
+                    'text_extraction_status' => Subtopic::TEXT_EXTRACTION_FAILED,
+                ]);
+
+            Log::warning('Reviewer PDF is missing from public storage.', [
+                'subtopic_id' => $subtopic->id,
+                'file_path' => $subtopic->file_path,
+            ]);
+
+            return;
+        }
+
+        $updated = Subtopic::query()
+            ->whereKey($subtopic->id)
+            ->where('file_path', $filePath)
+            ->update([
+                'extracted_text' => null,
+                'text_extraction_status' => Subtopic::TEXT_EXTRACTION_PROCESSING,
+            ]);
+        if ($updated === 0) {
+            return;
+        }
+
+        try {
+            $extractedText = $extractor->extract(Storage::disk('public')->path($filePath));
+        } catch (\RuntimeException $exception) {
+            Subtopic::query()
+                ->whereKey($subtopic->id)
+                ->where('file_path', $filePath)
+                ->update(['text_extraction_status' => Subtopic::TEXT_EXTRACTION_FAILED]);
+
+            Log::error('Immediate PyMuPDF reviewer extraction failed.', [
+                'subtopic_id' => $subtopic->id,
+                'file_path' => $filePath,
+                'exception' => $exception,
+            ]);
+
+            return;
+        }
+
+        Subtopic::query()
+            ->whereKey($subtopic->id)
+            ->where('file_path', $filePath)
+            ->update([
+                'extracted_text' => $extractedText,
+                'text_extraction_status' => Subtopic::TEXT_EXTRACTION_COMPLETED,
+            ]);
     }
 
     private function queuePendingPdfExtraction(Subtopic $subtopic): void

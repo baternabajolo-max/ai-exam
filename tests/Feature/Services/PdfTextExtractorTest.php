@@ -10,7 +10,7 @@ use Tests\TestCase;
 
 class PdfTextExtractorTest extends TestCase
 {
-    public function test_runs_the_configured_extractor_and_returns_its_markdown_output(): void
+    public function test_runs_the_configured_pymupdf_extractor_and_returns_its_text_output(): void
     {
         $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'lemu-pdf-extractor-'.bin2hex(random_bytes(6));
         mkdir($directory);
@@ -24,10 +24,8 @@ class PdfTextExtractorTest extends TestCase
             if (
                 ! is_file($argv[1])
                 || $argv[2] !== '--output'
-                || getenv('TORCH_DEVICE') !== 'cuda'
                 || getenv('PYTHONUTF8') !== '1'
                 || getenv('PYTHONIOENCODING') !== 'utf-8'
-                || getenv('MATH_PDF_MODE') !== 'fast'
             ) {
                 exit(2);
             }
@@ -44,7 +42,6 @@ class PdfTextExtractorTest extends TestCase
             'services.math_pdf.python_arguments' => [],
             'services.math_pdf.script' => $scriptPath,
             'services.math_pdf.timeout' => 60,
-            'services.math_pdf.mode' => 'fast',
         ]);
 
         $outputPath = null;
@@ -87,14 +84,13 @@ class PdfTextExtractorTest extends TestCase
             'services.math_pdf.python_arguments' => [],
             'services.math_pdf.script' => $scriptPath,
             'services.math_pdf.timeout' => 60,
-            'services.math_pdf.mode' => 'fast',
         ]);
         Log::shouldReceive('info')
             ->once()
-            ->with('Math PDF processing page progress.', ['progress' => 'page=1/1 started']);
+            ->with('PyMuPDF reviewer extraction page progress.', ['progress' => 'page=1/1 started']);
         Log::shouldReceive('error')
             ->once()
-            ->with('Math PDF Python process failed.', Mockery::on(
+            ->with('PyMuPDF reviewer extraction process failed.', Mockery::on(
                 static fn (array $context): bool => $context['exit_code'] === 7
                     && $context['stdout'] === "PAGE_PROGRESS page=1/1 started\nstdout marker error"
                     && $context['stderr'] === 'stderr marker error'

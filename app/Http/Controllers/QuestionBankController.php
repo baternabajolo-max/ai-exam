@@ -32,7 +32,10 @@ class QuestionBankController extends Controller
     {
         $data = $this->questionBankData($request);
         if ($data['selectedTopic'] !== null) {
-            return redirect()->route('admin.question-bank.topics.show', $data['selectedTopic']);
+            return redirect()->route('admin.question-bank.topics.show', array_filter([
+                'topic' => $data['selectedTopic'],
+                'faculty_id' => $data['selectedFacultyId'],
+            ]));
         }
 
         return view('admin.question-bank.index', $data + ['showTopicPage' => false]);
@@ -58,6 +61,7 @@ class QuestionBankController extends Controller
         $rules = [
             'course_id' => ['nullable', 'integer', 'exists:courses,id'],
             'topic_id' => ['nullable', 'integer', 'exists:topics,id'],
+            'faculty_id' => ['nullable', 'integer', 'exists:users,id'],
             'difficulty' => ['nullable', Rule::in(['easy', 'medium', 'hard'])],
             'health' => ['nullable', Rule::in(['all', 'healthy', 'needs_review', 'flagged', 'untested'])],
         ];
@@ -97,6 +101,22 @@ class QuestionBankController extends Controller
                 ? $courses->first()->id
                 : null);
         $course = $courses->firstWhere('id', $selectedCourseId);
+        $facultyDepartmentId = $readOnly ? $selectedDepartmentId : $user->department_id;
+        $filterFaculty = $facultyDepartmentId === null
+            ? collect()
+            : User::query()
+                ->where('role', 'admin')
+                ->where(function (Builder $query) use ($facultyDepartmentId): void {
+                    $query->where('department_id', $facultyDepartmentId)
+                        ->orWhereHas('handledCourses', fn ($query) => $query
+                            ->where('courses.department_id', $facultyDepartmentId));
+                })
+                ->orderBy('name')
+                ->get(['id', 'name', 'department_id']);
+        $selectedFacultyId = isset($validated['faculty_id']) ? (int) $validated['faculty_id'] : null;
+        $selectedFaculty = $selectedFacultyId === null
+            ? null
+            : $filterFaculty->firstWhere('id', $selectedFacultyId);
         $canFlagQuestions = $readOnly || (
             $user->role === 'admin'
             && $user->department_id !== null
@@ -104,6 +124,11 @@ class QuestionBankController extends Controller
         );
         abort_if($selectedCourseId !== null && ! $courses->contains('id', $selectedCourseId), 404);
         abort_if($readOnly && $selectedCourseId !== null && $selectedDepartmentId === null, 404);
+        abort_if(
+            $selectedFacultyId !== null
+                && ($selectedCourseId === null || $selectedFaculty === null),
+            404,
+        );
         $selectedTopicId = isset($validated['topic_id']) ? (int) $validated['topic_id'] : null;
         $selectedDifficulty = $validated['difficulty'] ?? null;
         $selectedHealth = $validated['health'] ?? 'all';
@@ -115,7 +140,10 @@ class QuestionBankController extends Controller
                 ->where('course_id', $selectedCourseId)
                 ->where('is_folder', true)
                 ->with('createdBy:id,name')
-                ->withCount('bankItems as questions_count')
+                ->withCount([
+                    'bankItems as questions_count' => fn ($query) => $query
+                        ->when($selectedFacultyId !== null, fn ($query) => $query->where('author_id', $selectedFacultyId)),
+                ])
                 ->orderBy('name')
                 ->get();
         $selectedTopic = $selectedTopicId === null
@@ -149,6 +177,9 @@ class QuestionBankController extends Controller
             } elseif ($selectedDifficulty !== null) {
                 $itemsQuery->where('difficulty', $selectedDifficulty);
             }
+        }
+        if ($selectedFacultyId !== null) {
+            $itemsQuery->where('author_id', $selectedFacultyId);
         }
         $perPage = 20;
         if ($selectedHealth === 'all') {
@@ -185,6 +216,9 @@ class QuestionBankController extends Controller
             'canFlagQuestions' => $canFlagQuestions,
             'selectedDepartmentId' => $selectedDepartmentId,
             'selectedCourseId' => $selectedCourseId,
+            'filterFaculty' => $filterFaculty,
+            'selectedFaculty' => $selectedFaculty,
+            'selectedFacultyId' => $selectedFacultyId,
             'topics' => $topics,
             'selectedTopic' => $selectedTopic,
             'topicHasOtherFacultyQuestions' => $topicHasOtherFacultyQuestions,

@@ -4,13 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Models\Course;
 use App\Models\Department;
+use App\Models\QuestionBankItem;
 use App\Models\Result;
 use App\Models\StudySession;
+use App\Models\Topic;
 use App\Models\User;
+use App\Notifications\FacultyMonitoringMessageNotification;
 use App\Services\LeaderboardPointsService;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class SuperAdminController extends Controller
@@ -18,57 +24,292 @@ class SuperAdminController extends Controller
     public function monitoring(Request $request): View
     {
         $validated = $request->validate([
+            'college_id' => ['nullable', 'integer', 'exists:departments,id'],
             'course_id' => ['nullable', 'integer', 'exists:courses,id'],
         ]);
+        $selectedDepartmentId = isset($validated['college_id']) ? (int) $validated['college_id'] : null;
         $selectedCourseId = isset($validated['course_id']) ? (int) $validated['course_id'] : null;
         $selectedCourse = $selectedCourseId === null
             ? null
-            : Course::query()->findOrFail($selectedCourseId);
-        $courses = Course::query()
-            ->with('department:id,name')
+            : Course::query()->with('department:id,name')->findOrFail($selectedCourseId);
+        abort_if(
+            $selectedCourse !== null
+                && $selectedDepartmentId !== null
+                && (int) $selectedCourse->department_id !== $selectedDepartmentId,
+            404,
+        );
+        $selectedDepartmentId ??= $selectedCourse?->department_id;
+        $selectedDepartment = $selectedDepartmentId === null
+            ? null
+            : Department::query()->findOrFail($selectedDepartmentId);
+        $departments = Department::query()
+            ->withCount('questionBankItems')
             ->orderBy('name')
-            ->get(['id', 'name', 'department_id']);
-        $faculties = User::query()
-            ->where('role', 'admin')
-            ->when($selectedCourseId !== null, fn ($query) => $query->where(function ($query) use ($selectedCourseId): void {
-                $query->where('course_id', $selectedCourseId)
-                    ->orWhereHas('questionBankItems', fn ($query) => $query->where('course_id', $selectedCourseId));
-            }))
-            ->with([
-                'department:id,name',
-                'course:id,name',
-            ])
-            ->withCount([
-                'questionBankItems' => fn ($query) => $query->when(
-                    $selectedCourseId !== null,
-                    fn ($query) => $query->where('course_id', $selectedCourseId),
-                ),
-            ])
-            ->orderBy('name')
-            ->get();
-        $recentAssessments = Result::query()
-            ->whereHas('test', fn ($query) => $query->where('is_scheduled_exam', true))
-            ->when($selectedCourseId !== null, fn ($query) => $query->whereHas(
-                'test',
-                fn ($query) => $query->where('course_id', $selectedCourseId),
-            ))
-            ->with([
-                'user:id,name,course_id',
-                'user.course:id,name',
-                'test:id,title,course_id',
-                'test.course:id,name',
-            ])
-            ->latest()
-            ->take(25)
-            ->get();
+            ->get(['id', 'name']);
+        $overview = [
+            'total_faculty' => User::query()->where('role', 'admin')->count(),
+            'active_faculty' => User::query()->where('role', 'admin')->whereNotNull('email_verified_at')->count(),
+            'total_questions' => QuestionBankItem::query()->count(),
+            'total_exam_submissions' => Result::query()
+                ->whereHas('test', fn ($query) => $query->where('is_scheduled_exam', true))
+                ->count(),
+        ];
+        $monthlyContributions = $this->monthlyQuestionContributions($selectedDepartmentId, $selectedCourseId);
+        $allCollegesMonthlyContributions = $selectedDepartmentId === null
+            ? $monthlyContributions
+            : $this->monthlyQuestionContributions();
 
         return view('super-admin.monitoring.index', compact(
-            'faculties',
-            'recentAssessments',
-            'courses',
+            'allCollegesMonthlyContributions',
+            'departments',
+            'overview',
+            'monthlyContributions',
+            'selectedDepartment',
+            'selectedDepartmentId',
             'selectedCourseId',
             'selectedCourse',
         ));
+    }
+
+    public function monitoringPrograms(Department $department): JsonResponse
+    {
+        $programs = Course::query()
+            ->where('department_id', $department->id)
+            ->withCount('questionBankItems')
+            ->orderBy('name')
+            ->get(['id', 'name', 'department_id'])
+            ->map(fn (Course $course): array => [
+                'id' => $course->id,
+                'name' => $course->name,
+                'question_count' => (int) $course->question_bank_items_count,
+            ])
+            ->values();
+
+        return response()->json([
+            'college' => [
+                'id' => $department->id,
+                'name' => $department->name,
+            ],
+            'programs' => $programs,
+            'monthly_contributions' => $this->monthlyQuestionContributions((int) $department->id),
+        ]);
+    }
+
+    public function monitoringProgramDetails(Course $course): JsonResponse
+    {
+        $course->loadMissing('department:id,name');
+        $folderRecords = Topic::query()
+            ->where('course_id', $course->id)
+            ->where('is_folder', true)
+            ->withCount('bankItems as questions_count')
+            ->orderBy('name')
+            ->get(['id', 'course_id', 'name']);
+        $folderContributions = QuestionBankItem::query()
+            ->whereIn('topic_id', $folderRecords->modelKeys())
+            ->whereNotNull('author_id')
+            ->select(['topic_id', 'author_id'])
+            ->selectRaw('COUNT(*) as question_count')
+            ->groupBy('topic_id', 'author_id')
+            ->with('author:id,name')
+            ->get()
+            ->groupBy('topic_id');
+        $folders = $folderRecords
+            ->map(function (Topic $topic) use ($folderContributions): array {
+                $contributors = $folderContributions->get($topic->id, collect())
+                    ->filter(fn (QuestionBankItem $item): bool => $item->author !== null)
+                    ->map(fn (QuestionBankItem $item): array => [
+                        'id' => $item->author_id,
+                        'name' => $item->author->name,
+                        'question_count' => (int) $item->question_count,
+                    ])
+                    ->values();
+
+                return [
+                    'id' => $topic->id,
+                    'name' => $topic->name,
+                    'question_count' => (int) $topic->questions_count,
+                    'contributor_count' => $contributors->count(),
+                    'contributors' => $contributors,
+                ];
+            })
+            ->values();
+        $facultyFolders = [];
+        foreach ($folders as $folder) {
+            foreach ($folder['contributors'] as $contributor) {
+                $facultyFolders[$contributor['id']][] = [
+                    'id' => $folder['id'],
+                    'name' => $folder['name'],
+                    'question_count' => $contributor['question_count'],
+                ];
+            }
+        }
+        $faculty = User::query()
+            ->where('role', 'admin')
+            ->where(function ($query) use ($course): void {
+                $query->where('department_id', $course->department_id)
+                    ->orWhereHas('handledCourses', fn ($query) => $query
+                        ->where('courses.department_id', $course->department_id));
+            })
+            ->withCount([
+                'questionBankItems as selected_program_questions_count' => fn ($query) => $query
+                    ->where('course_id', $course->id),
+            ])
+            ->orderBy('name')
+            ->get(['id', 'name', 'department_id'])
+            ->map(fn (User $user): array => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'question_count' => (int) $user->selected_program_questions_count,
+                'folders' => $facultyFolders[$user->id] ?? [],
+            ])
+            ->values();
+        $programQuestionCount = QuestionBankItem::query()
+            ->where('course_id', $course->id)
+            ->count();
+        $attributedQuestionCount = $faculty->sum('question_count');
+
+        return response()->json([
+            'program' => [
+                'id' => $course->id,
+                'name' => $course->name,
+                'college_id' => $course->department_id,
+                'college_name' => $course->department->name,
+                'question_count' => $programQuestionCount,
+            ],
+            'folders' => $folders,
+            'faculty' => $faculty,
+            'unlisted_creator_question_count' => max(0, $programQuestionCount - $attributedQuestionCount),
+            'monthly_contributions' => $this->monthlyQuestionContributions(
+                (int) $course->department_id,
+                (int) $course->id,
+            ),
+        ]);
+    }
+
+    public function monitoringFacultyContributions(Request $request, User $faculty): JsonResponse
+    {
+        $validated = $request->validate([
+            'course_id' => ['required', 'integer', 'exists:courses,id'],
+        ]);
+        $course = Course::query()
+            ->with('department:id,name')
+            ->findOrFail((int) $validated['course_id']);
+        abort_unless($faculty->role === 'admin' && $this->facultyBelongsToDepartment($faculty, (int) $course->department_id), 404);
+
+        $folders = Topic::query()
+            ->where('course_id', $course->id)
+            ->where('is_folder', true)
+            ->withCount([
+                'bankItems as questions_count' => fn ($query) => $query->where('author_id', $faculty->id),
+            ])
+            ->orderBy('name')
+            ->get(['id', 'course_id', 'name'])
+            ->map(fn (Topic $topic): array => [
+                'id' => $topic->id,
+                'name' => $topic->name,
+                'question_count' => (int) $topic->questions_count,
+                'has_contribution' => $topic->questions_count > 0,
+            ])
+            ->values();
+        $contributedFolderCount = $folders->where('question_count', '>', 0)->count();
+
+        return response()->json([
+            'faculty' => [
+                'id' => $faculty->id,
+                'name' => $faculty->name,
+            ],
+            'college' => $course->department->name,
+            'program' => $course->name,
+            'total_questions' => (int) QuestionBankItem::query()
+                ->where('course_id', $course->id)
+                ->where('author_id', $faculty->id)
+                ->count(),
+            'folder_count' => $contributedFolderCount,
+            'total_folder_count' => $folders->count(),
+            'folders' => $folders,
+        ]);
+    }
+
+    public function sendFacultyMessage(Request $request, User $faculty): JsonResponse
+    {
+        $validated = $request->validate([
+            'course_id' => ['required', 'integer', 'exists:courses,id'],
+            'message' => ['required', 'string', 'max:2000'],
+        ]);
+        $course = Course::query()->findOrFail((int) $validated['course_id']);
+        abort_unless($faculty->role === 'admin' && $this->facultyBelongsToDepartment($faculty, (int) $course->department_id), 404);
+
+        $message = trim($validated['message']);
+        if ($message === '') {
+            throw ValidationException::withMessages([
+                'message' => 'Enter a message.',
+            ]);
+        }
+
+        $faculty->notify(new FacultyMonitoringMessageNotification(
+            $request->user()->name,
+            $message,
+            (int) $course->id,
+        ));
+
+        return response()->json([
+            'message' => 'Message sent to '.$faculty->name.'.',
+        ]);
+    }
+
+    private function facultyBelongsToDepartment(User $faculty, int $departmentId): bool
+    {
+        return (int) $faculty->department_id === $departmentId
+            || $faculty->handledCourses()
+                ->where('courses.department_id', $departmentId)
+                ->exists();
+    }
+
+    /**
+     * @return array{labels: list<string>, values: list<int>, current_month_count: int, previous_month_count: int, month_delta: int}
+     */
+    private function monthlyQuestionContributions(?int $departmentId = null, ?int $courseId = null): array
+    {
+        $now = CarbonImmutable::now();
+        $firstMonth = $now->startOfMonth()->subMonths(11);
+        $driver = DB::connection()->getDriverName();
+        $monthExpression = match ($driver) {
+            'mysql', 'mariadb' => "DATE_FORMAT(created_at, '%Y-%m')",
+            'sqlite' => "strftime('%Y-%m', created_at)",
+            'pgsql' => "TO_CHAR(created_at, 'YYYY-MM')",
+            default => throw new \LogicException("Monthly monitoring is not configured for the {$driver} driver."),
+        };
+        $groupedQuestions = QuestionBankItem::query()
+            ->whereNotNull('author_id')
+            ->whereBetween('created_at', [$firstMonth->startOfDay(), $now->endOfMonth()])
+            ->when($courseId !== null, fn ($query) => $query->where('course_id', $courseId))
+            ->when(
+                $departmentId !== null && $courseId === null,
+                fn ($query) => $query->whereHas('course', fn ($query) => $query->where('department_id', $departmentId)),
+            )
+            ->selectRaw("{$monthExpression} as contribution_month, COUNT(id) as question_count")
+            ->groupBy('contribution_month')
+            ->orderBy('contribution_month')
+            ->pluck('question_count', 'contribution_month');
+        $labels = [];
+        $values = [];
+
+        for ($monthOffset = 0; $monthOffset < 12; $monthOffset++) {
+            $month = $firstMonth->addMonths($monthOffset);
+            $labels[] = $month->format('M Y');
+            $values[] = (int) $groupedQuestions->get($month->format('Y-m'), 0);
+        }
+
+        $currentMonthCount = $values[11];
+        $previousMonthCount = $values[10];
+
+        return [
+            'labels' => $labels,
+            'values' => $values,
+            'current_month_count' => $currentMonthCount,
+            'previous_month_count' => $previousMonthCount,
+            'month_delta' => $currentMonthCount - $previousMonthCount,
+        ];
     }
 
     public function dashboard(Request $request): View|RedirectResponse

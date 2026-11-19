@@ -2,7 +2,7 @@
 
 $pythonBinary = env('PYTHON_BINARY');
 $defaultPythonBinary = PHP_OS_FAMILY === 'Windows'
-    ? 'C:\\Program Files\\Python312\\python.exe'
+    ? 'py'
     : 'python3';
 
 return [
@@ -50,8 +50,7 @@ return [
         'python_binary' => $pythonBinary ?: $defaultPythonBinary,
         'python_arguments' => [],
         'script' => base_path('scripts/process_math_pdf.py'),
-        'timeout' => (int) env('MATH_PDF_PROCESS_TIMEOUT', 6900),
-        'mode' => env('MATH_PDF_MODE', 'fast'),
+        'timeout' => (int) env('MATH_PDF_PROCESS_TIMEOUT', 120),
     ],
 
 ];

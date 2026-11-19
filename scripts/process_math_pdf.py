@@ -1,106 +1,56 @@
-# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-"""Convert a math-heavy PDF to LaTeX-aware Markdown with Marker on CUDA."""
+"""Extract selectable text from PDF reviewers with PyMuPDF."""
 
 from __future__ import annotations
 
 import argparse
-import gc
 import os
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any
 
 
 def convert_pdf_to_markdown(pdf_path: Path) -> str:
-    """Convert a PDF one page at a time with low-memory Marker settings."""
-    os.environ.update({
-        "TORCH_DEVICE": "cuda",
-        "DETECTOR_BATCH_SIZE": "1",
-        "OCR_ERROR_BATCH_SIZE": "1",
-        "FAST_LAYOUT_BATCH_SIZE": "1",
-        "SURYA_INFERENCE_PARALLEL": "1",
-        "DISABLE_TQDM": "1",
-    })
-
+    """Extract text in reading order, processing one page at a time."""
     try:
-        import torch
-        from marker.config.parser import ConfigParser
-        from marker.converters.pdf import PdfConverter
-        from marker.models import create_model_dict, shutdown_models
-        from marker.output import text_from_rendered
-        from pypdfium2 import PdfDocument
+        import fitz
     except ImportError as error:
         raise RuntimeError(
-            "Marker and PyTorch are required. Install Marker, then install the CUDA "
-            "PyTorch build using the command at the top of this script."
+            "PyMuPDF is required. Install the dependencies with "
+            "'py -m pip install -r requirements.txt' on Windows or "
+            "'python3 -m pip install -r requirements.txt' on macOS/Linux."
         ) from error
 
-    if not torch.cuda.is_available():
-        raise RuntimeError(
-            "CUDA is unavailable. Verify that an NVIDIA driver is installed and that "
-            "PyTorch was installed with the CUDA 12.1 build."
-        )
+    page_text: list[str] = []
+    with fitz.open(str(pdf_path)) as document:
+        if document.needs_pass:
+            raise RuntimeError("The PDF is password-protected and cannot be read.")
 
-    mode = os.environ.get("MATH_PDF_MODE", "fast").strip().lower()
-    if mode not in {"fast", "balanced"}:
-        raise ValueError("MATH_PDF_MODE must be either 'fast' or 'balanced'.")
-
-    pdf_document = PdfDocument(str(pdf_path))
-    try:
-        page_count = len(pdf_document)
-    finally:
-        pdf_document.close()
-
-    if page_count < 1:
-        raise RuntimeError("The PDF contains no pages.")
-
-    model_dict: dict[str, Any] | None = None
-    page_markdown: list[str] = []
-    try:
-        model_dict = create_model_dict()
-        config = ConfigParser({
-            "output_format": "markdown",
-            "mode": mode,
-        }).generate_config_dict()
-
-        config["pdftext_workers"] = 1
-        config["cache_pdftext_pages"] = False
+        page_count = document.page_count
+        if page_count < 1:
+            raise RuntimeError("The PDF contains no pages.")
 
         for page_number in range(page_count):
             print(
                 f"PAGE_PROGRESS page={page_number + 1}/{page_count} started",
                 flush=True,
             )
-            page_config = {**config, "page_range": [page_number]}
-            converter = PdfConverter(artifact_dict=model_dict, config=page_config)
-            rendered_document = converter(str(pdf_path))
-            markdown, _, _ = text_from_rendered(rendered_document)
-            if isinstance(markdown, str):
-                page_markdown.append(markdown.strip())
-
+            text = document.load_page(page_number).get_text("text", sort=True).strip()
+            if text:
+                page_text.append(text)
             print(
                 f"PAGE_PROGRESS page={page_number + 1}/{page_count} completed",
                 flush=True,
             )
-            del converter, rendered_document, markdown
-            gc.collect()
-            torch.cuda.empty_cache()
-    finally:
-        if model_dict is not None:
-            shutdown_models(model_dict)
-        gc.collect()
-        torch.cuda.empty_cache()
 
-    combined_markdown = "\n\n".join(markdown for markdown in page_markdown if markdown)
-    if not combined_markdown:
-        raise RuntimeError("Marker returned no readable text or equations.")
+    combined_text = "\n\n".join(page_text)
+    if not combined_text:
+        raise RuntimeError("No selectable text was found in the PDF.")
 
-    return combined_markdown
+    return combined_text
 
 
 def process_pdf(pdf_path: Path, output_path: Path) -> None:
-    """Convert the complete PDF and atomically save its Markdown output."""
+    """Extract PDF text and atomically save it as Markdown."""
     pdf_path = pdf_path.resolve()
     output_path = output_path.resolve()
 
@@ -121,9 +71,9 @@ def process_pdf(pdf_path: Path, output_path: Path) -> None:
     os.close(file_descriptor)
 
     try:
-        markdown = convert_pdf_to_markdown(pdf_path)
+        extracted_text = convert_pdf_to_markdown(pdf_path)
         with temporary_path.open("w", encoding="utf-8", newline="\n") as output:
-            output.write(markdown + "\n")
+            output.write(extracted_text + "\n")
         temporary_path.replace(output_path)
     except Exception:
         temporary_path.unlink(missing_ok=True)
@@ -132,7 +82,7 @@ def process_pdf(pdf_path: Path, output_path: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Convert a math-heavy PDF to LaTeX Markdown using Marker on CUDA."
+        description="Extract selectable text from a PDF using PyMuPDF."
     )
     parser.add_argument("pdf", type=Path, help="Source PDF path")
     parser.add_argument("--output", required=True, type=Path, help="Output Markdown path")
@@ -141,7 +91,7 @@ def main() -> int:
     try:
         process_pdf(args.pdf, args.output)
     except (OSError, RuntimeError, ValueError) as error:
-        print(f"Math PDF processing failed: {error}", file=sys.stderr)
+        print(f"PDF text extraction failed: {error}", file=sys.stderr)
         return 1
 
     return 0

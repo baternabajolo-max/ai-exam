@@ -36,11 +36,6 @@ class PdfTextExtractor
             throw new RuntimeException('The math PDF processing timeout is invalid.');
         }
 
-        $mode = config('services.math_pdf.mode');
-        if (! is_string($mode) || ! in_array($mode, ['fast', 'balanced'], true)) {
-            throw new RuntimeException('The math PDF processing mode must be fast or balanced.');
-        }
-
         $temporaryFile = tempnam(sys_get_temp_dir(), 'lemu-reviewer-text-');
         if ($temporaryFile === false) {
             throw new RuntimeException('A temporary file for reviewer text could not be created.');
@@ -53,10 +48,8 @@ class PdfTextExtractor
         try {
             $process = Process::timeout($timeout)
                 ->env([
-                    'TORCH_DEVICE' => 'cuda',
                     'PYTHONUTF8' => '1',
                     'PYTHONIOENCODING' => 'utf-8',
-                    'MATH_PDF_MODE' => $mode,
                 ])
                 ->run([
                     $pythonBinary,
@@ -76,7 +69,7 @@ class PdfTextExtractor
                         $progressBuffer = substr($progressBuffer, $newline + 1);
 
                         if (str_starts_with($line, 'PAGE_PROGRESS ')) {
-                            Log::info('Math PDF processing page progress.', [
+                            Log::info('PyMuPDF reviewer extraction page progress.', [
                                 'progress' => substr($line, strlen('PAGE_PROGRESS ')),
                             ]);
                         }
@@ -85,13 +78,13 @@ class PdfTextExtractor
 
             $remainingProgress = trim($progressBuffer);
             if (str_starts_with($remainingProgress, 'PAGE_PROGRESS ')) {
-                Log::info('Math PDF processing page progress.', [
+                Log::info('PyMuPDF reviewer extraction page progress.', [
                     'progress' => substr($remainingProgress, strlen('PAGE_PROGRESS ')),
                 ]);
             }
 
             if ($process->failed()) {
-                Log::error('Math PDF Python process failed.', [
+                Log::error('PyMuPDF reviewer extraction process failed.', [
                     'python_binary' => $pythonBinary,
                     'python_arguments' => $pythonArguments,
                     'pdf_path' => $pdfPath,
@@ -101,7 +94,7 @@ class PdfTextExtractor
                 ]);
 
                 throw new RuntimeException(sprintf(
-                    "CUDA math PDF processing exited with code %s.\nSTDERR:\n%s\nSTDOUT:\n%s",
+                    "PyMuPDF extraction exited with code %s.\nSTDERR:\n%s\nSTDOUT:\n%s",
                     $process->exitCode() ?? 'unknown',
                     trim($process->errorOutput()),
                     trim($process->output()),

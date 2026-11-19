@@ -44,6 +44,11 @@ class Course extends Model
         return $this->hasMany(Module::class);
     }
 
+    public function questionBankItems(): HasMany
+    {
+        return $this->hasMany(QuestionBankItem::class);
+    }
+
     public function tests(): HasMany
     {
         return $this->hasMany(Test::class);

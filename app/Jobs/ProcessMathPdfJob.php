@@ -77,7 +77,7 @@ class ProcessMathPdfJob implements ShouldBeUnique, ShouldQueue
                 'text_extraction_status' => Subtopic::TEXT_EXTRACTION_FAILED,
             ]);
 
-        Log::error('Reviewer PDF math processing failed.', [
+        Log::error('PyMuPDF reviewer text extraction failed.', [
             'subtopic_id' => $this->subtopicId,
             'file_path' => $this->filePath,
             'exception' => $exception,

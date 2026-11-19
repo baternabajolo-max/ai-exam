@@ -10,10 +10,13 @@ use App\Models\Result;
 use App\Models\StudySession;
 use App\Models\Subtopic;
 use App\Models\Test as StudentTest;
+use App\Models\Topic;
 use App\Models\User;
+use App\Notifications\FacultyMonitoringMessageNotification;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class RoleDashboardAnalyticsTest extends TestCase
@@ -782,79 +785,271 @@ class RoleDashboardAnalyticsTest extends TestCase
     {
         $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
         $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
-        User::factory()->create([
+        $activeFaculty = User::factory()->create([
             'role' => 'admin',
             'department_id' => $department->id,
             'course_id' => $course->id,
         ]);
+        User::factory()->unverified()->create([
+            'role' => 'admin',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $this->createQuestionBankItem($course, $activeFaculty);
+        $scheduledExam = StudentTest::create([
+            'title' => 'Software Engineering Midterm',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+            'created_by' => $activeFaculty->id,
+            'is_scheduled_exam' => true,
+        ]);
+        $practiceQuiz = StudentTest::create([
+            'title' => 'Practice Quiz',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+            'created_by' => $activeFaculty->id,
+            'is_scheduled_exam' => false,
+        ]);
+        $student = User::factory()->create([
+            'role' => 'student',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $this->createResult($student, $scheduledExam, 8, 10, now());
+        $this->createResult($student, $practiceQuiz, 9, 10, now());
         $superAdmin = User::factory()->create(['role' => 'super-admin']);
 
         $response = $this->actingAs($superAdmin)
             ->get(route('super-admin.monitoring'))
             ->assertOk()
             ->assertSee('Institution oversight')
-            ->assertSee('Faculty accounts')
-            ->assertSee('Academic program association, shared Question Bank contributions')
-            ->assertSee('Recent exam submissions')
+            ->assertSee('Total Faculty')
+            ->assertSee('Active Faculty')
+            ->assertSee('Total Questions Added')
+            ->assertSee('Examination Submissions')
+            ->assertSee('College & Program Monitoring')
+            ->assertSee('monitoring-level-tabs', false)
+            ->assertSee('college-monitoring-tab', false)
+            ->assertSee('program-monitoring-tab', false)
+            ->assertSee('Monthly Faculty Contributions')
+            ->assertDontSee('Recent Faculty Activities')
+            ->assertSee('id="faculty-message-form"', false)
+            ->assertSee('Message Faculty')
+            ->assertSee('View Questions')
+            ->assertSee('faculty-contribution-sort', false)
+            ->assertSee('faculty-modal-total-folder-count', false)
+            ->assertSee('faculty-modal-folders', false)
+            ->assertDontSee('question-folder-grid', false)
+            ->assertDontSee('Folder contribution coverage')
             ->assertSee(route('super-admin.question-bank.index'))
             ->assertSee(route('super-admin.item-analysis.index'))
-            ->assertViewHas('faculties', fn ($faculties): bool => $faculties->count() === 1)
-            ->assertViewHas('recentAssessments', fn ($assessments): bool => $assessments->isEmpty());
+            ->assertViewHas('overview', [
+                'total_faculty' => 2,
+                'active_faculty' => 1,
+                'total_questions' => 1,
+                'total_exam_submissions' => 1,
+            ]);
 
-        $this->assertStringContainsString('>1</p>', $response->getContent());
-        $this->assertStringContainsString('>0</p>', $response->getContent());
+        $this->assertSame(1, $response->viewData('departments')->first()->question_bank_items_count);
     }
 
-    public function test_super_admin_monitoring_filters_faculty_and_exam_results_by_program(): void
+    public function test_super_admin_monitoring_resolves_selected_course_to_its_college(): void
     {
         $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
         $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
         $otherCourse = Course::create(['name' => 'Data Science', 'code' => 'DS', 'department_id' => $department->id]);
         $faculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
-        $otherFaculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
-        $selectedStudent = User::factory()->create(['role' => 'student', 'department_id' => $department->id, 'course_id' => $course->id]);
-        $otherStudent = User::factory()->create(['role' => 'student', 'department_id' => $department->id, 'course_id' => $otherCourse->id]);
-        QuestionBankItem::create([
-            'course_id' => $course->id,
-            'author_id' => $faculty->id,
-            'question' => 'Software Engineering question?',
-            'options' => ['A', 'B', 'C', 'D'],
-            'correct_answer' => 'A',
-        ]);
-        QuestionBankItem::create([
-            'course_id' => $otherCourse->id,
-            'author_id' => $otherFaculty->id,
-            'question' => 'Data Science question?',
-            'options' => ['A', 'B', 'C', 'D'],
-            'correct_answer' => 'B',
-        ]);
-        $exam = StudentTest::create([
-            'title' => 'Software Engineering Midterm',
-            'department_id' => $department->id,
-            'course_id' => $course->id,
-            'created_by' => $faculty->id,
-            'is_scheduled_exam' => true,
-        ]);
-        $otherExam = StudentTest::create([
-            'title' => 'Data Science Midterm',
-            'department_id' => $department->id,
-            'course_id' => $otherCourse->id,
-            'created_by' => $otherFaculty->id,
-            'is_scheduled_exam' => true,
-        ]);
-        $this->createResult($selectedStudent, $exam, 8, 10, now()->subDay());
-        $this->createResult($otherStudent, $otherExam, 5, 10, now()->subDay());
+        $this->createQuestionBankItem($otherCourse, $faculty);
+
+        $response = $this->actingAs(User::factory()->create(['role' => 'super-admin']))
+            ->get(route('super-admin.monitoring', ['course_id' => $course->id]))
+            ->assertOk()
+            ->assertViewHas('selectedCourseId', $course->id)
+            ->assertViewHas('selectedDepartmentId', $department->id);
+
+        $this->assertSame(0, array_sum($response->viewData('monthlyContributions')['values']));
+        $this->assertSame(1, array_sum($response->viewData('allCollegesMonthlyContributions')['values']));
+    }
+
+    public function test_super_admin_monitoring_programs_endpoint_returns_only_programs_in_selected_college(): void
+    {
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $otherDepartment = Department::create(['name' => 'Education', 'code' => 'EDU']);
+        $firstCourse = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
+        $secondCourse = Course::create(['name' => 'Data Science', 'code' => 'DS', 'department_id' => $department->id]);
+        $foreignCourse = Course::create(['name' => 'Teacher Education', 'code' => 'TE', 'department_id' => $otherDepartment->id]);
+        $faculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $this->createQuestionBankItem($firstCourse, $faculty);
+        $this->createQuestionBankItem($firstCourse, $faculty);
+        $this->createQuestionBankItem($secondCourse, $faculty);
+        $this->createQuestionBankItem($foreignCourse, $faculty);
 
         $this->actingAs(User::factory()->create(['role' => 'super-admin']))
-            ->get(route('super-admin.monitoring', ['course_id' => $course->id]))
-            ->assertSee('for Software Engineering')
-            ->assertSee('Software Engineering')
-            ->assertDontSee('Data Science Midterm')
-            ->assertViewHas('faculties', fn ($faculties): bool => $faculties->count() === 1
-                && $faculties->first()->id === $faculty->id
-                && $faculties->first()->question_bank_items_count === 1)
-            ->assertViewHas('recentAssessments', fn ($assessments): bool => $assessments->count() === 1
-                && $assessments->first()->test->id === $exam->id);
+            ->getJson(route('super-admin.monitoring.programs', $department))
+            ->assertOk()
+            ->assertJsonPath('college.name', 'Computing')
+            ->assertJsonCount(2, 'programs')
+            ->assertJsonPath('programs.0.name', 'Data Science')
+            ->assertJsonPath('programs.0.question_count', 1)
+            ->assertJsonPath('programs.1.name', 'Software Engineering')
+            ->assertJsonPath('programs.1.question_count', 2);
+    }
+
+    public function test_program_details_include_all_folders_and_zero_contribution_faculty(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-11-19 12:00:00'));
+
+        $department = Department::create(['name' => 'Engineering', 'code' => 'ENG']);
+        $otherDepartment = Department::create(['name' => 'Education', 'code' => 'EDU']);
+        $course = Course::create(['name' => 'Civil Engineering', 'code' => 'CE', 'department_id' => $department->id]);
+        $otherCourse = Course::create(['name' => 'Education', 'code' => 'ED', 'department_id' => $otherDepartment->id]);
+        $faculty = User::factory()->create([
+            'name' => 'Avery Faculty',
+            'role' => 'admin',
+            'department_id' => $department->id,
+        ]);
+        $zeroContributionFaculty = User::factory()->create([
+            'name' => 'Bree Zero',
+            'role' => 'admin',
+            'department_id' => $department->id,
+        ]);
+        $foreignFaculty = User::factory()->create([
+            'name' => 'Casey Foreign',
+            'role' => 'admin',
+            'department_id' => $otherDepartment->id,
+        ]);
+        $structuralFolder = Topic::create([
+            'course_id' => $course->id,
+            'created_by' => $faculty->id,
+            'name' => 'Structural Engineering',
+            'is_folder' => true,
+        ]);
+        $hydraulicsFolder = Topic::create([
+            'course_id' => $course->id,
+            'created_by' => $faculty->id,
+            'name' => 'Hydraulics',
+            'is_folder' => true,
+        ]);
+        $emptyFolder = Topic::create([
+            'course_id' => $course->id,
+            'created_by' => $faculty->id,
+            'name' => 'Geotechnical Engineering',
+            'is_folder' => true,
+        ]);
+        Topic::create([
+            'course_id' => $course->id,
+            'created_by' => $faculty->id,
+            'name' => 'Legacy non-folder topic',
+            'is_folder' => false,
+        ]);
+        $firstQuestion = $this->createQuestionBankItem($course, $faculty, $structuralFolder);
+        $this->createQuestionBankItem($course, $faculty, $structuralFolder);
+        $this->createQuestionBankItem($course, null, $hydraulicsFolder);
+        $this->createQuestionBankItem($otherCourse, $foreignFaculty);
+        $firstQuestion->update(['question' => 'Edited without creating another contribution.']);
+
+        $response = $this->actingAs(User::factory()->create(['role' => 'super-admin']))
+            ->getJson(route('super-admin.monitoring.program-details', $course))
+            ->assertOk()
+            ->assertJsonPath('program.question_count', 3)
+            ->assertJsonPath('unlisted_creator_question_count', 1)
+            ->assertJsonCount(3, 'folders')
+            ->assertJsonPath('folders.0.name', 'Geotechnical Engineering')
+            ->assertJsonPath('folders.0.contributor_count', 0)
+            ->assertJsonPath('folders.1.question_count', 1)
+            ->assertJsonPath('folders.2.contributors.0.name', $faculty->name)
+            ->assertJsonPath('faculty.0.name', $faculty->name)
+            ->assertJsonPath('faculty.0.question_count', 2)
+            ->assertJsonPath('faculty.0.folders.0.name', 'Structural Engineering')
+            ->assertJsonPath('faculty.1.name', $zeroContributionFaculty->name)
+            ->assertJsonPath('faculty.1.question_count', 0);
+
+        $this->assertSame(2, array_sum($response->json('monthly_contributions.values')));
+        $this->assertArrayNotHasKey('recent_activities', $response->json());
+        $this->assertStringNotContainsString($foreignFaculty->name, json_encode($response->json('faculty')));
+    }
+
+    public function test_faculty_contribution_modal_only_returns_folders_with_that_facultys_questions(): void
+    {
+        $department = Department::create(['name' => 'Engineering', 'code' => 'ENG']);
+        $otherDepartment = Department::create(['name' => 'Education', 'code' => 'EDU']);
+        $course = Course::create(['name' => 'Civil Engineering', 'code' => 'CE', 'department_id' => $department->id]);
+        $otherCourse = Course::create(['name' => 'Education', 'code' => 'ED', 'department_id' => $otherDepartment->id]);
+        $faculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $otherFaculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $structuralFolder = Topic::create([
+            'course_id' => $course->id,
+            'created_by' => $faculty->id,
+            'name' => 'Structural Engineering',
+            'is_folder' => true,
+        ]);
+        $hydraulicsFolder = Topic::create([
+            'course_id' => $course->id,
+            'created_by' => $otherFaculty->id,
+            'name' => 'Hydraulics',
+            'is_folder' => true,
+        ]);
+        $this->createQuestionBankItem($course, $faculty, $structuralFolder);
+        $this->createQuestionBankItem($course, $faculty, $structuralFolder);
+        $this->createQuestionBankItem($course, $otherFaculty, $hydraulicsFolder);
+
+        $this->actingAs(User::factory()->create(['role' => 'super-admin']))
+            ->getJson(route('super-admin.monitoring.faculty-contributions', [
+                'faculty' => $faculty,
+                'course_id' => $course->id,
+            ]))
+            ->assertOk()
+            ->assertJsonPath('college', 'Engineering')
+            ->assertJsonPath('program', 'Civil Engineering')
+            ->assertJsonPath('total_questions', 2)
+            ->assertJsonPath('folder_count', 1)
+            ->assertJsonPath('total_folder_count', 2)
+            ->assertJsonCount(2, 'folders')
+            ->assertJsonPath('folders.0.name', 'Hydraulics')
+            ->assertJsonPath('folders.0.has_contribution', false)
+            ->assertJsonPath('folders.1.name', 'Structural Engineering')
+            ->assertJsonPath('folders.1.has_contribution', true);
+
+        $this->actingAs(User::factory()->create(['role' => 'super-admin']))
+            ->getJson(route('super-admin.monitoring.faculty-contributions', [
+                'faculty' => $faculty,
+                'course_id' => $otherCourse->id,
+            ]))
+            ->assertNotFound();
+    }
+
+    public function test_super_admin_can_send_a_one_way_message_to_a_college_faculty_member(): void
+    {
+        Notification::fake();
+        $department = Department::create(['name' => 'Engineering', 'code' => 'ENG']);
+        $course = Course::create(['name' => 'Civil Engineering', 'code' => 'CE', 'department_id' => $department->id]);
+        $faculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $superAdmin = User::factory()->create(['role' => 'super-admin', 'name' => 'System Admin']);
+
+        $this->actingAs($superAdmin)
+            ->postJson(route('super-admin.monitoring.faculty-message', $faculty), [
+                'course_id' => $course->id,
+                'message' => 'Please review your folder coverage.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('message', 'Message sent to '.$faculty->name.'.');
+
+        Notification::assertSentTo(
+            $faculty,
+            FacultyMonitoringMessageNotification::class,
+            fn (FacultyMonitoringMessageNotification $notification, array $channels): bool => $channels === ['database']
+                && $notification->senderName === 'System Admin'
+                && $notification->message === 'Please review your folder coverage.'
+                && $notification->courseId === $course->id,
+        );
+    }
+
+    public function test_non_super_admin_cannot_access_faculty_monitoring_endpoints(): void
+    {
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $this->actingAs(User::factory()->create(['role' => 'admin', 'department_id' => $department->id]))
+            ->get(route('super-admin.monitoring'))
+            ->assertRedirect(route('admin.dashboard'));
     }
 
     public function test_role_dashboard_period_filters_reject_unsupported_ranges(): void
@@ -927,5 +1122,20 @@ class RoleDashboardAnalyticsTest extends TestCase
         ]);
         $result->created_at = $createdAt;
         $result->save();
+    }
+
+    private function createQuestionBankItem(
+        Course $course,
+        ?User $author,
+        ?Topic $folder = null,
+    ): QuestionBankItem {
+        return QuestionBankItem::create([
+            'course_id' => $course->id,
+            'topic_id' => $folder?->id,
+            'author_id' => $author?->id,
+            'question' => 'Monitoring question for '.$course->name.'?',
+            'options' => ['A', 'B', 'C', 'D'],
+            'correct_answer' => 'A',
+        ]);
     }
 }

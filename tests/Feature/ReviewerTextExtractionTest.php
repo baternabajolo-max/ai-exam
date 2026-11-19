@@ -55,7 +55,7 @@ class ReviewerTextExtractionTest extends TestCase
             && $job->queue === 'math-pdf');
     }
 
-    public function test_student_review_shows_extraction_status_without_showing_pdf_until_text_is_ready(): void
+    public function test_student_review_extracts_pending_pdf_text_before_rendering_the_reviewer(): void
     {
         Queue::fake([ProcessMathPdfJob::class]);
         Storage::fake('public');
@@ -64,26 +64,31 @@ class ReviewerTextExtractionTest extends TestCase
         ]);
         Storage::disk('public')->put($subtopic->file_path, '%PDF-1.7');
 
+        $extractor = $this->mock(PdfTextExtractor::class);
+        $extractor->shouldReceive('extract')
+            ->once()
+            ->with(Storage::disk('public')->path($subtopic->file_path))
+            ->andReturn('Reviewer text available on the first page request.');
+
         $response = $this->actingAs($student)->get(route('student.learn.review', $subtopic));
 
         $response
-            ->assertSee('Queued for math processing...')
-            ->assertSee('This page will update automatically when processing is complete.')
-            ->assertSee('math-processing-spinner', false)
-            ->assertSee('Checking again shortly...')
-            ->assertSee('const pollInterval = 5000', false)
-            ->assertSee('data-status-url="'.route('student.learn.subtopic.extraction-status', $subtopic).'"', false)
+            ->assertSee('Reviewer text available on the first page request.')
+            ->assertSee('id="documentBody"', false)
+            ->assertDontSee('math-processing-spinner', false)
+            ->assertDontSee('const pollInterval = 5000', false)
             ->assertDontSee('<iframe', false)
             ->assertDontSee('PDF reviewer')
             ->assertDontSee('Open or download original reviewer');
         $this->assertDatabaseHas('subtopics', [
             'id' => $subtopic->id,
-            'text_extraction_status' => Subtopic::TEXT_EXTRACTION_PENDING,
+            'extracted_text' => 'Reviewer text available on the first page request.',
+            'text_extraction_status' => Subtopic::TEXT_EXTRACTION_COMPLETED,
         ]);
-        Queue::assertPushed(ProcessMathPdfJob::class);
+        Queue::assertNothingPushed();
     }
 
-    public function test_student_review_shows_the_math_processing_card_while_a_pdf_is_processing(): void
+    public function test_student_review_finishes_an_in_progress_pdf_extraction_synchronously(): void
     {
         Queue::fake([ProcessMathPdfJob::class]);
         Storage::fake('public');
@@ -93,13 +98,23 @@ class ReviewerTextExtractionTest extends TestCase
         ]);
         Storage::disk('public')->put($subtopic->file_path, '%PDF-1.7');
 
+        $extractor = $this->mock(PdfTextExtractor::class);
+        $extractor->shouldReceive('extract')
+            ->once()
+            ->with(Storage::disk('public')->path($subtopic->file_path))
+            ->andReturn('Recovered reviewer text.');
+
         $this->actingAs($student)
             ->get(route('student.learn.review', $subtopic))
-            ->assertSee('Processing math equations...')
-            ->assertSee('math-processing-spinner', false)
-            ->assertSee('aria-live="polite"', false)
-            ->assertSee('const pollInterval = 5000', false);
+            ->assertSee('Recovered reviewer text.')
+            ->assertSee('id="documentBody"', false)
+            ->assertDontSee('math-processing-spinner', false);
 
+        $this->assertDatabaseHas('subtopics', [
+            'id' => $subtopic->id,
+            'extracted_text' => 'Recovered reviewer text.',
+            'text_extraction_status' => Subtopic::TEXT_EXTRACTION_COMPLETED,
+        ]);
         Queue::assertNothingPushed();
     }
 
@@ -249,6 +264,12 @@ class ReviewerTextExtractionTest extends TestCase
             'text_extraction_status' => Subtopic::TEXT_EXTRACTION_PROCESSING,
         ]);
         Storage::disk('public')->put($subtopic->file_path, '%PDF-1.7');
+
+        $extractor = $this->mock(PdfTextExtractor::class);
+        $extractor->shouldReceive('extract')
+            ->once()
+            ->with(Storage::disk('public')->path($subtopic->file_path))
+            ->andThrow(new RuntimeException('PyMuPDF could not read this PDF.'));
 
         (new ProcessMathPdfJob($subtopic->id, $subtopic->file_path))
             ->failed(new RuntimeException('PyMuPDF is unavailable.'));

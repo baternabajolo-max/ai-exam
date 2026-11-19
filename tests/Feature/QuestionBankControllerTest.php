@@ -33,6 +33,7 @@ class QuestionBankControllerTest extends TestCase
             ->get(route('admin.question-bank.index'))
             ->assertOk()
             ->assertSee('id="faculty-question-course"', false)
+            ->assertSee('id="faculty-question-faculty"', false)
             ->assertSee('Filter by program')
             ->assertDontSee('data-bs-target="#createTopicModal"', false)
             ->assertDontSee('data-focus-program', false)
@@ -935,6 +936,7 @@ class QuestionBankControllerTest extends TestCase
             ->assertOk()
             ->assertSee('id="question-bank-department"', false)
             ->assertSee('id="question-bank-course"', false)
+            ->assertSee('id="question-bank-faculty"', false)
             ->assertSee('disabled', false)
             ->assertSee('data-bs-target="#questionBankFilterModal"', false)
             ->assertSee('data-question-bank-filter-trigger', false)
@@ -985,6 +987,71 @@ class QuestionBankControllerTest extends TestCase
             'course_id' => $course->id,
             'question' => 'Super Admin cannot create this question?',
         ]);
+    }
+
+    public function test_super_admin_can_filter_program_questions_by_faculty_across_folders(): void
+    {
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
+        $faculty = User::factory()->create(['name' => 'Avery Faculty', 'role' => 'admin', 'department_id' => $department->id]);
+        $otherFaculty = User::factory()->create(['name' => 'Bree Faculty', 'role' => 'admin', 'department_id' => $department->id]);
+        $firstTopic = $this->createTopic($course, $faculty, 'Networking');
+        $secondTopic = $this->createTopic($course, $faculty, 'Security');
+        $firstQuestion = QuestionBankItem::create([
+            'course_id' => $course->id,
+            'topic_id' => $firstTopic->id,
+            'author_id' => $faculty->id,
+            'question' => 'What does a router forward?',
+            'options' => ['Packets', 'Screens', 'Power', 'Sound'],
+            'correct_answer' => 'Packets',
+        ]);
+        $secondQuestion = QuestionBankItem::create([
+            'course_id' => $course->id,
+            'topic_id' => $secondTopic->id,
+            'author_id' => $faculty->id,
+            'question' => 'What protects a transmitted secret?',
+            'options' => ['Encryption', 'Compression', 'Routing', 'Caching'],
+            'correct_answer' => 'Encryption',
+        ]);
+        $otherQuestion = QuestionBankItem::create([
+            'course_id' => $course->id,
+            'topic_id' => $firstTopic->id,
+            'author_id' => $otherFaculty->id,
+            'question' => 'What does DNS resolve?',
+            'options' => ['Names', 'Images', 'Ports', 'Colors'],
+            'correct_answer' => 'Names',
+        ]);
+
+        $facultyFilteredResponse = $this->actingAs(User::factory()->create(['role' => 'super-admin']))
+            ->get(route('super-admin.question-bank.index', [
+                'department_id' => $department->id,
+                'course_id' => $course->id,
+                'faculty_id' => $faculty->id,
+            ]))
+            ->assertOk()
+            ->assertSee($faculty->name)
+            ->assertSee($firstTopic->name)
+            ->assertSee($secondTopic->name)
+            ->assertDontSee($firstQuestion->question)
+            ->assertDontSee($secondQuestion->question)
+            ->assertDontSee($otherQuestion->question)
+            ->assertViewHas('selectedFacultyId', $faculty->id)
+            ->assertViewHas('showTopicPage', false);
+
+        $this->assertSame(
+            1,
+            $facultyFilteredResponse->viewData('topics')->firstWhere('id', $firstTopic->id)->questions_count,
+        );
+
+        $this->get(route('super-admin.question-bank.index', [
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+            'faculty_id' => $otherFaculty->id,
+            'topic_id' => $firstTopic->id,
+        ]))
+            ->assertOk()
+            ->assertSee($otherQuestion->question)
+            ->assertDontSee($firstQuestion->question);
     }
 
     public function test_super_admin_must_select_the_matching_college_before_a_program(): void

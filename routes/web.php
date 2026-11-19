@@ -93,6 +93,14 @@ Route::middleware(['auth', 'role:super-admin'])->prefix('super-admin')->name('su
     Route::get('/results', [ExamResultsController::class, 'adminIndex'])->name('results.index');
     Route::get('/results/{exam}/student/{student}', [ExamResultsController::class, 'adminStudent'])->name('results.student');
     Route::get('/monitoring', [SuperAdminController::class, 'monitoring'])->name('monitoring');
+    Route::get('/monitoring/colleges/{department}/programs', [SuperAdminController::class, 'monitoringPrograms'])
+        ->name('monitoring.programs');
+    Route::get('/monitoring/programs/{course}', [SuperAdminController::class, 'monitoringProgramDetails'])
+        ->name('monitoring.program-details');
+    Route::get('/monitoring/faculty/{faculty}/contributions', [SuperAdminController::class, 'monitoringFacultyContributions'])
+        ->name('monitoring.faculty-contributions');
+    Route::post('/monitoring/faculty/{faculty}/message', [SuperAdminController::class, 'sendFacultyMessage'])
+        ->name('monitoring.faculty-message');
     Route::get('/tests', [TestController::class, 'index'])->name('tests.index');
     Route::get('/tests/create', [TestController::class, 'create'])->name('tests.create');
     Route::get('/tests/{test}/edit', [TestController::class, 'edit'])->name('tests.edit');
