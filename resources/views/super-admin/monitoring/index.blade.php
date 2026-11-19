@@ -72,13 +72,13 @@
 
     <section class="card shadow-sm mb-4" aria-labelledby="faculty-monitoring-heading">
         <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2 py-3">
-            <div><h2 class="h5 mb-1" id="faculty-monitoring-heading">{{ $selectedCourse ? 'Faculty for '.$selectedCourse->name : 'All Faculty' }}</h2><p class="small text-muted mb-0">Academic program association, individual Question Bank size, and account status.</p></div>
+            <div><h2 class="h5 mb-1" id="faculty-monitoring-heading">{{ $selectedCourse ? 'Faculty for '.$selectedCourse->name : 'All Faculty' }}</h2><p class="small text-muted mb-0">Academic program association, shared Question Bank contributions, and account status.</p></div>
             <span class="badge text-bg-light">{{ $faculties->count() }} total</span>
         </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
-                    <tr><th scope="col">Faculty member</th><th scope="col">Program</th><th scope="col">Own Question Bank</th><th scope="col">Account</th><th scope="col">Last active</th></tr>
+                    <tr><th scope="col">Faculty member</th><th scope="col">Program</th><th scope="col">Questions contributed</th><th scope="col">Account</th><th scope="col">Last active</th></tr>
                 </thead>
                 <tbody>
                     @forelse ($faculties as $faculty)
@@ -86,7 +86,7 @@
                             <td><div class="fw-semibold">{{ $faculty->name }}</div><div class="small text-muted">{{ $faculty->email }}</div></td>
                             <td>{{ $selectedCourse?->name ?? $faculty->course?->name ?? 'Varies by Question Bank' }}</td>
                             <td>
-                                <a class="btn btn-sm btn-outline-primary" href="{{ route('super-admin.question-bank.index', ['author_id' => $faculty->id]) }}">
+                                <a class="btn btn-sm btn-outline-primary" href="{{ route('super-admin.question-bank.index', ['department_id' => $faculty->department_id]) }}">
                                     <i class="bi bi-journal-text me-1" aria-hidden="true"></i>
                                     {{ $faculty->question_bank_items_count }} question{{ $faculty->question_bank_items_count === 1 ? '' : 's' }}
                                 </a>

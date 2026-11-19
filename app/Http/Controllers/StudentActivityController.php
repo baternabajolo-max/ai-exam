@@ -15,8 +15,6 @@ use Illuminate\Support\Facades\DB;
 
 class StudentActivityController extends Controller
 {
-    private const MAX_HEARTBEAT_CREDIT_SECONDS = 45;
-
     public function index(Request $request): JsonResponse
     {
         return $this->activityForStudent($request, $request->user());
@@ -27,6 +25,267 @@ class StudentActivityController extends Controller
         $this->ensureAdminCanViewStudent($request, $student);
 
         return $this->activityForStudent($request, $student);
+    }
+
+    public function adminModuleStudentActivity(Request $request, Module $module, User $student): JsonResponse
+    {
+        $this->ensureAdminCanViewStudent($request, $student);
+        abort_unless(
+            $module->department_id === $request->user()->department_id
+                && $module->course_id !== null
+                && $student->course_id === $module->course_id,
+            404,
+        );
+
+        $validated = $request->validate([
+            'month' => ['required_with:date', 'nullable', 'date_format:Y-m'],
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'subtopic_id' => ['nullable', 'integer'],
+        ]);
+        $selectedSubtopicId = isset($validated['subtopic_id']) ? (int) $validated['subtopic_id'] : null;
+        if ($selectedSubtopicId !== null) {
+            $module->subtopics()->whereKey($selectedSubtopicId)->firstOrFail();
+        }
+        $registeredMonth = $student->created_at->startOfMonth();
+        $currentMonth = now()->startOfMonth();
+        $selectedMonth = isset($validated['month'])
+            ? CarbonImmutable::createFromFormat('!Y-m', $validated['month'])
+            : CarbonImmutable::instance($currentMonth);
+
+        abort_unless(
+            $selectedMonth->gte($registeredMonth)
+                && $selectedMonth->lte($currentMonth),
+            404,
+        );
+        $selectedDate = isset($validated['date'])
+            ? CarbonImmutable::createFromFormat('!Y-m-d', $validated['date'])
+            : null;
+        abort_unless(
+            $selectedDate === null || $selectedDate->format('Y-m') === $selectedMonth->format('Y-m'),
+            404,
+        );
+
+        $creditedSecondsByTopic = [];
+        $verifiedSessions = StudySession::query()
+            ->verifiedByQuiz()
+            ->where('user_id', $student->id)
+            ->where('module_id', $module->id)
+            ->when($selectedSubtopicId !== null, fn ($query) => $query->where('subtopic_id', $selectedSubtopicId))
+            ->whereBetween('activity_date', [
+                $registeredMonth->startOfDay(),
+                $currentMonth->endOfMonth()->endOfDay(),
+            ])
+            ->selectRaw('activity_date, subtopic_id, SUM(active_seconds) as active_seconds')
+            ->groupBy('activity_date', 'subtopic_id')
+            ->orderBy('activity_date')
+            ->orderBy('subtopic_id')
+            ->get();
+        $verifiedSessions = $verifiedSessions
+            ->map(function (StudySession $session) use (&$creditedSecondsByTopic): StudySession {
+                $topicId = (int) $session->subtopic_id;
+                $remainingSeconds = max(
+                    0,
+                    StudySession::TOPIC_STUDY_CAP_SECONDS - ($creditedSecondsByTopic[$topicId] ?? 0),
+                );
+                $session->active_seconds = min(max(0, (int) $session->active_seconds), $remainingSeconds);
+                $creditedSecondsByTopic[$topicId] = ($creditedSecondsByTopic[$topicId] ?? 0) + $session->active_seconds;
+
+                return $session;
+            })
+            ->filter(fn (StudySession $session): bool => $session->active_seconds > 0)
+            ->values();
+
+        $months = [];
+        $period = CarbonImmutable::parse($registeredMonth);
+        while ($period <= $currentMonth) {
+            $months[$period->format('Y-m')] = [
+                'month' => $period->format('Y-m'),
+                'label' => $period->format('M Y'),
+                'active_seconds' => 0,
+            ];
+            $period = $period->addMonth();
+        }
+
+        foreach ($verifiedSessions as $session) {
+            $monthKey = CarbonImmutable::parse($session->activity_date)->format('Y-m');
+            if (isset($months[$monthKey])) {
+                $months[$monthKey]['active_seconds'] += (int) $session->active_seconds;
+            }
+        }
+
+        $dailyTotals = $verifiedSessions
+            ->filter(fn (StudySession $session): bool => CarbonImmutable::parse($session->activity_date)->format('Y-m') === $selectedMonth->format('Y-m'))
+            ->groupBy(fn (StudySession $session): string => CarbonImmutable::parse($session->activity_date)->toDateString())
+            ->map(fn ($sessions): int => (int) $sessions->sum('active_seconds'));
+        $selectedMonthTopicTotals = $verifiedSessions
+            ->filter(fn (StudySession $session): bool => CarbonImmutable::parse($session->activity_date)->format('Y-m') === $selectedMonth->format('Y-m'))
+            ->groupBy('subtopic_id')
+            ->map(fn ($sessions): int => (int) $sessions->sum('active_seconds'));
+        $selectedDateTopicTotals = $selectedDate === null
+            ? collect()
+            : $verifiedSessions
+                ->filter(fn (StudySession $session): bool => CarbonImmutable::parse($session->activity_date)->toDateString() === $selectedDate->toDateString())
+                ->groupBy('subtopic_id')
+                ->map(fn ($sessions): int => (int) $sessions->sum('active_seconds'));
+        $allTimeTopicTotals = $verifiedSessions
+            ->groupBy('subtopic_id')
+            ->map(fn ($sessions): int => (int) $sessions->sum('active_seconds'));
+        $topics = Subtopic::query()
+            ->where('module_id', $module->id)
+            ->orderBy('title')
+            ->get(['id', 'title'])
+            ->map(fn (Subtopic $subtopic): array => [
+                'id' => $subtopic->id,
+                'title' => $subtopic->title,
+                'active_seconds' => $selectedDate === null
+                    ? (int) ($selectedMonthTopicTotals[$subtopic->id] ?? 0)
+                    : (int) ($selectedDateTopicTotals[$subtopic->id] ?? 0),
+                'all_time_seconds' => (int) ($allTimeTopicTotals[$subtopic->id] ?? 0),
+            ]);
+
+        return response()->json([
+            'module' => ['id' => $module->id, 'title' => $module->title],
+            'month' => $selectedMonth->format('Y-m'),
+            'subtopic_id' => $selectedSubtopicId,
+            'date' => $selectedDate?->toDateString(),
+            'months' => array_values($months),
+            'calendar' => [
+                'label' => $selectedMonth->format('F Y'),
+                'first_weekday' => $selectedMonth->startOfMonth()->dayOfWeek,
+                'days_in_month' => $selectedMonth->daysInMonth,
+                'days' => collect(range(1, $selectedMonth->daysInMonth))
+                    ->map(fn (int $day): array => [
+                        'day' => $day,
+                        'date' => $selectedMonth->startOfMonth()->addDays($day - 1)->toDateString(),
+                        'active_seconds' => (int) ($dailyTotals[$selectedMonth->startOfMonth()->addDays($day - 1)->toDateString()] ?? 0),
+                    ]),
+            ],
+            'topics' => $topics,
+        ]);
+    }
+
+    public function adminModuleStudentOverview(Request $request, Module $module, User $student): JsonResponse
+    {
+        $this->ensureAdminCanViewStudent($request, $student);
+        abort_unless(
+            $module->department_id === $request->user()->department_id
+                && $module->course_id !== null
+                && $student->course_id === $module->course_id,
+            404,
+        );
+
+        $validated = $request->validate([
+            'subtopic_id' => ['nullable', 'integer'],
+        ]);
+        $topics = $module->subtopics()->orderBy('title')->get(['id', 'title']);
+        $selectedSubtopicId = isset($validated['subtopic_id']) ? (int) $validated['subtopic_id'] : null;
+        if ($selectedSubtopicId !== null && ! $topics->contains('id', $selectedSubtopicId)) {
+            abort(404);
+        }
+        $topicIds = $topics->modelKeys();
+        $sessionsByTopic = StudySession::query()
+            ->where('user_id', $student->id)
+            ->where('module_id', $module->id)
+            ->whereIn('subtopic_id', $topicIds)
+            ->selectRaw('subtopic_id, SUM(active_seconds) as active_seconds')
+            ->selectRaw('MAX(last_heartbeat_at) as last_session_at')
+            ->groupBy('subtopic_id')
+            ->get()
+            ->keyBy('subtopic_id');
+        $attemptsByTopic = Result::query()
+            ->whereBelongsTo($student)
+            ->where('total_questions', '>', 0)
+            ->whereHas('test', fn ($query) => $query
+                ->where('department_id', $module->department_id)
+                ->where('course_id', $module->course_id)
+                ->whereIn('subtopic_id', $topicIds)
+                ->where('is_general', false))
+            ->with('test:id,subtopic_id')
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get(['id', 'test_id', 'score', 'total_questions', 'created_at'])
+            ->groupBy(fn (Result $result): int => $result->test->subtopic_id);
+
+        $topicRows = $topics->map(function (Subtopic $topic) use ($sessionsByTopic, $attemptsByTopic): array {
+            $topicSessions = $sessionsByTopic->get($topic->id);
+            $topicAttempts = $attemptsByTopic->get($topic->id, collect());
+            $studySeconds = min(
+                (int) ($topicSessions?->active_seconds ?? 0),
+                StudySession::TOPIC_STUDY_CAP_SECONDS,
+            );
+            $scorePercentages = $topicAttempts
+                ->map(fn (Result $result): float => ($result->score / $result->total_questions) * 100);
+            $bestScore = $scorePercentages->isNotEmpty() ? round((float) $scorePercentages->max(), 2) : null;
+            $verifiedSeconds = $topicAttempts->isNotEmpty() ? $studySeconds : 0;
+            $completed = $verifiedSeconds >= 300 && $bestScore !== null && $bestScore >= 75;
+            $lastActiveAt = collect([
+                $topicSessions?->last_session_at,
+                $topicAttempts->max('created_at'),
+            ])->filter()->max();
+
+            return [
+                'id' => $topic->id,
+                'title' => $topic->title,
+                'study_seconds' => $studySeconds,
+                'verified_seconds' => $verifiedSeconds,
+                'quiz_attempts' => $topicAttempts->count(),
+                'average_score' => $scorePercentages->isNotEmpty()
+                    ? round((float) $scorePercentages->avg(), 2)
+                    : null,
+                'best_score' => $bestScore,
+                'completed' => $completed,
+                'status' => $completed
+                    ? 'Completed'
+                    : ($studySeconds > 0 || $topicAttempts->isNotEmpty() ? 'In Progress' : 'Not Started'),
+                'last_active_at' => $lastActiveAt === null
+                    ? null
+                    : CarbonImmutable::parse($lastActiveAt)->toIso8601String(),
+            ];
+        });
+
+        $allAttempts = $attemptsByTopic->flatten(1);
+        $lastActiveAt = collect([
+            $sessionsByTopic->max('last_session_at'),
+            $allAttempts->max('created_at'),
+        ])->filter()->max();
+        $status = $lastActiveAt === null || CarbonImmutable::parse($lastActiveAt)->lt(now()->subDays(14))
+            ? 'Inactive'
+            : ($topicRows->contains(fn (array $topic): bool => ! $topic['completed']) ? 'Needs Review' : 'On Track');
+        $selectedTopic = $selectedSubtopicId === null
+            ? null
+            : $topicRows->firstWhere('id', $selectedSubtopicId);
+        $selectedAttempts = $selectedSubtopicId === null
+            ? []
+            : $attemptsByTopic->get($selectedSubtopicId, collect())
+                ->values()
+                ->map(fn (Result $result, int $index): array => [
+                    'attempt' => $index + 1,
+                    'score' => round(($result->score / $result->total_questions) * 100, 2),
+                    'points' => round(($result->score / $result->total_questions) * 50, 2),
+                    'created_at' => $result->created_at->toIso8601String(),
+                ])
+                ->all();
+
+        return response()->json([
+            'student' => ['id' => $student->id, 'name' => $student->name],
+            'module' => ['id' => $module->id, 'title' => $module->title],
+            'status' => $selectedTopic['status'] ?? $status,
+            'selected_topic' => $selectedTopic,
+            'verified_seconds' => (int) $topicRows->sum('verified_seconds'),
+            'topics_completed' => $topicRows->where('completed', true)->count(),
+            'topic_count' => $topicRows->count(),
+            'average_score' => $allAttempts->isNotEmpty()
+                ? round((float) $allAttempts->avg(
+                    fn (Result $result): float => ($result->score / $result->total_questions) * 100,
+                ), 2)
+                : null,
+            'quiz_attempts' => $allAttempts->count(),
+            'last_active_at' => $lastActiveAt === null
+                ? null
+                : CarbonImmutable::parse($lastActiveAt)->toIso8601String(),
+            'topics' => $topicRows->values(),
+            'attempts' => $selectedAttempts,
+        ]);
     }
 
     private function activityForStudent(Request $request, User $student): JsonResponse
@@ -144,9 +403,10 @@ class StudentActivityController extends Controller
             ->firstOrFail();
         $startedAt = now();
 
-        $studySession = DB::transaction(function () use ($student, $subtopic, $startedAt): StudySession {
+        $sessionData = DB::transaction(function () use ($student, $subtopic, $startedAt): array {
             User::query()->whereKey($student->id)->lockForUpdate()->firstOrFail();
 
+            $topicSeconds = $this->topicStudySeconds($student, $subtopic->id);
             StudySession::query()
                 ->where('user_id', $student->id)
                 ->whereNull('ended_at')
@@ -156,7 +416,17 @@ class StudentActivityController extends Controller
                     'updated_at' => $startedAt,
                 ]);
 
-            return StudySession::create([
+            $remainingSeconds = max(0, StudySession::TOPIC_STUDY_CAP_SECONDS - $topicSeconds);
+            if ($remainingSeconds === 0) {
+                return [
+                    'session' => null,
+                    'active_seconds' => $topicSeconds,
+                    'remaining_seconds' => 0,
+                    'capped' => true,
+                ];
+            }
+
+            $session = StudySession::create([
                 'user_id' => $student->id,
                 'module_id' => $subtopic->module_id,
                 'subtopic_id' => $subtopic->id,
@@ -165,12 +435,21 @@ class StudentActivityController extends Controller
                 'started_at' => $startedAt,
                 'last_heartbeat_at' => $startedAt,
             ]);
+
+            return [
+                'session' => $session,
+                'active_seconds' => $topicSeconds,
+                'remaining_seconds' => $remainingSeconds,
+                'capped' => false,
+            ];
         });
 
         return response()->json([
-            'session_id' => $studySession->id,
-            'active_seconds' => $studySession->active_seconds,
-        ], 201);
+            'session_id' => $sessionData['session']?->id,
+            'active_seconds' => $sessionData['active_seconds'],
+            'remaining_seconds' => $sessionData['remaining_seconds'],
+            'capped' => $sessionData['capped'],
+        ], $sessionData['session'] === null ? 200 : 201);
     }
 
     public function heartbeat(Request $request, StudySession $studySession): JsonResponse
@@ -180,10 +459,18 @@ class StudentActivityController extends Controller
         $now = now();
 
         $heartbeat = DB::transaction(function () use ($studySession, $student, $now): array {
+            User::query()->whereKey($student->id)->lockForUpdate()->firstOrFail();
             $session = $this->lockedSessionForStudent($studySession, $student);
 
             if ($session->ended_at !== null) {
-                return ['expired' => true, 'active_seconds' => $session->active_seconds];
+                $topicSeconds = $this->topicStudySeconds($student, $session->subtopic_id);
+
+                return [
+                    'expired' => true,
+                    'active_seconds' => $topicSeconds,
+                    'remaining_seconds' => max(0, StudySession::TOPIC_STUDY_CAP_SECONDS - $topicSeconds),
+                    'capped' => $topicSeconds >= StudySession::TOPIC_STUDY_CAP_SECONDS,
+                ];
             }
 
             if ($session->activity_date->toDateString() !== $now->toDateString()) {
@@ -192,57 +479,108 @@ class StudentActivityController extends Controller
                     'pause_reason' => 'midnight',
                 ])->save();
 
-                return ['expired' => true, 'active_seconds' => $session->active_seconds];
+                $topicSeconds = $this->topicStudySeconds($student, $session->subtopic_id);
+
+                return [
+                    'expired' => true,
+                    'active_seconds' => $topicSeconds,
+                    'remaining_seconds' => max(0, StudySession::TOPIC_STUDY_CAP_SECONDS - $topicSeconds),
+                    'capped' => $topicSeconds >= StudySession::TOPIC_STUDY_CAP_SECONDS,
+                ];
             }
 
-            $this->recordElapsedTime($session, $now);
+            $topicSeconds = $this->topicStudySeconds($student, $session->subtopic_id);
+            $remainingSeconds = max(0, StudySession::TOPIC_STUDY_CAP_SECONDS - $topicSeconds);
+            $creditedSeconds = $this->recordElapsedTime($session, $now, $remainingSeconds);
+            $topicSeconds += $creditedSeconds;
+            $capped = $topicSeconds >= StudySession::TOPIC_STUDY_CAP_SECONDS;
+            if ($capped) {
+                $session->ended_at = $now;
+                $session->pause_reason = 'topic_cap';
+            }
             $session->save();
 
-            return ['expired' => false, 'active_seconds' => $session->active_seconds];
+            return [
+                'expired' => $capped,
+                'active_seconds' => $topicSeconds,
+                'remaining_seconds' => max(0, StudySession::TOPIC_STUDY_CAP_SECONDS - $topicSeconds),
+                'capped' => $capped,
+            ];
         });
 
         if ($heartbeat['expired']) {
             return response()->json([
-                'message' => 'This reading session ended. Start a new session to continue tracking.',
+                'message' => $heartbeat['capped']
+                    ? 'This topic has reached its creditable study-time limit.'
+                    : 'This reading session ended. Start a new session to continue tracking.',
                 'active_seconds' => $heartbeat['active_seconds'],
+                'remaining_seconds' => $heartbeat['remaining_seconds'],
+                'capped' => $heartbeat['capped'],
             ], 409);
         }
 
         return response()->json([
             'active_seconds' => $heartbeat['active_seconds'],
+            'remaining_seconds' => $heartbeat['remaining_seconds'],
+            'capped' => $heartbeat['capped'],
         ]);
+    }
+
+    public function heartbeatCurrent(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'session_id' => ['required', 'integer', 'exists:study_sessions,id'],
+        ]);
+
+        return $this->heartbeat($request, StudySession::findOrFail($validated['session_id']));
     }
 
     public function stop(Request $request, StudySession $studySession): JsonResponse
     {
         $validated = $request->validate([
-            'reason' => ['required', 'in:quiz,hidden,navigation,pagehide,manual'],
+            'reason' => ['required', 'in:quiz,hidden,inactive,navigation,pagehide,manual'],
         ]);
         $student = $request->user();
         $this->ensureSessionBelongsToStudent($studySession, $student);
         $stoppedAt = now();
 
-        $session = DB::transaction(function () use ($studySession, $student, $stoppedAt, $validated): StudySession {
+        $sessionData = DB::transaction(function () use ($studySession, $student, $stoppedAt, $validated): array {
+            User::query()->whereKey($student->id)->lockForUpdate()->firstOrFail();
             $lockedSession = $this->lockedSessionForStudent($studySession, $student);
+            $topicSeconds = $this->topicStudySeconds($student, $lockedSession->subtopic_id);
 
             if ($lockedSession->ended_at !== null) {
-                return $lockedSession;
+                return [
+                    'session' => $lockedSession,
+                    'active_seconds' => $topicSeconds,
+                    'remaining_seconds' => max(0, StudySession::TOPIC_STUDY_CAP_SECONDS - $topicSeconds),
+                    'capped' => $topicSeconds >= StudySession::TOPIC_STUDY_CAP_SECONDS,
+                ];
             }
 
             if ($lockedSession->activity_date->toDateString() === $stoppedAt->toDateString()) {
-                $this->recordElapsedTime($lockedSession, $stoppedAt);
+                $remainingSeconds = max(0, StudySession::TOPIC_STUDY_CAP_SECONDS - $topicSeconds);
+                $topicSeconds += $this->recordElapsedTime($lockedSession, $stoppedAt, $remainingSeconds);
             }
 
+            $capped = $topicSeconds >= StudySession::TOPIC_STUDY_CAP_SECONDS;
             $lockedSession->forceFill([
                 'ended_at' => $stoppedAt,
-                'pause_reason' => $validated['reason'],
+                'pause_reason' => $capped ? 'topic_cap' : $validated['reason'],
             ])->save();
 
-            return $lockedSession;
+            return [
+                'session' => $lockedSession,
+                'active_seconds' => $topicSeconds,
+                'remaining_seconds' => max(0, StudySession::TOPIC_STUDY_CAP_SECONDS - $topicSeconds),
+                'capped' => $capped,
+            ];
         });
 
         return response()->json([
-            'active_seconds' => $session->active_seconds,
+            'active_seconds' => $sessionData['active_seconds'],
+            'remaining_seconds' => $sessionData['remaining_seconds'],
+            'capped' => $sessionData['capped'],
             'stopped' => true,
         ]);
     }
@@ -410,11 +748,33 @@ class StudentActivityController extends Controller
             ->firstOrFail();
     }
 
-    private function recordElapsedTime(StudySession $session, CarbonInterface $now): void
-    {
+    private function recordElapsedTime(
+        StudySession $session,
+        CarbonInterface $now,
+        int $remainingSeconds,
+    ): int {
         $elapsedSeconds = max(0, $now->getTimestamp() - $session->last_heartbeat_at->getTimestamp());
-        $session->active_seconds += min($elapsedSeconds, self::MAX_HEARTBEAT_CREDIT_SECONDS);
+        if ($elapsedSeconds < StudySession::MIN_HEARTBEAT_SECONDS) {
+            return 0;
+        }
+
+        $creditedSeconds = min(
+            $elapsedSeconds,
+            StudySession::MAX_HEARTBEAT_SECONDS,
+            $remainingSeconds,
+        );
+        $session->active_seconds += $creditedSeconds;
         $session->last_heartbeat_at = $now;
+
+        return $creditedSeconds;
+    }
+
+    private function topicStudySeconds(User $student, int $subtopicId): int
+    {
+        return (int) StudySession::query()
+            ->where('user_id', $student->id)
+            ->where('subtopic_id', $subtopicId)
+            ->sum('active_seconds');
     }
 
     /**

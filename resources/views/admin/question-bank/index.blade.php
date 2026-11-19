@@ -62,12 +62,14 @@
 
     .faculty-question-bank__question .btn,
     .faculty-question-bank__hero .btn,
+    .faculty-question-bank__filter-trigger,
     .faculty-question-bank__add-button {
         transition: box-shadow .2s ease, transform .2s ease, background-color .2s ease;
     }
 
     .faculty-question-bank__question .btn:focus-visible,
     .faculty-question-bank__hero .btn:focus-visible,
+    .faculty-question-bank__filter-trigger:focus-visible,
     .faculty-question-bank__add-button:focus-visible {
         box-shadow: 0 0 0 .25rem rgb(99 102 241 / 25%);
         outline: 0;
@@ -76,6 +78,14 @@
     .faculty-question-bank__filter {
         flex: 1 1 26rem;
         max-width: 48rem;
+    }
+
+    .faculty-question-bank__filter-trigger {
+        align-items: center;
+        display: inline-flex;
+        height: 3rem;
+        justify-content: center;
+        width: 3rem;
     }
 
     .faculty-question-bank__section-heading {
@@ -394,56 +404,153 @@
         <div class="d-flex align-items-center gap-3 gap-md-4">
             <span class="faculty-question-bank__hero-icon" aria-hidden="true"><i class="bi bi-journal-richtext"></i></span>
             <div>
-                <div class="faculty-question-bank__eyebrow">Faculty workspace</div>
+                <div class="faculty-question-bank__eyebrow">{{ $readOnly ? 'Academic oversight' : 'Faculty workspace' }}</div>
                 <h1 class="display-6 fw-bold mt-1 mb-2">Question Bank</h1>
-                <p class="mb-0 text-white-50">Build and organize your private collection of exam-ready questions.</p>
+                <p class="mb-0 text-white-50">
+                    {{ $readOnly ? 'Review shared question folders by college and program. Disable questions that should not be used in future exams.' : 'Create and manage your questions in folders shared with Faculty in the same program.' }}
+                </p>
             </div>
         </div>
-        @if ($showTopicPage)
+        @if ($showTopicPage && ! $readOnly)
             <a href="{{ route('admin.question-bank.index', ['course_id' => $course->id]) }}" class="btn btn-light rounded-pill px-4">
+                <i class="bi bi-arrow-left me-1" aria-hidden="true"></i> Back to Topics
+            </a>
+        @elseif ($showTopicPage)
+            <a href="{{ route('super-admin.question-bank.index', ['department_id' => $selectedDepartmentId, 'course_id' => $course->id]) }}" class="btn btn-light rounded-pill px-4">
                 <i class="bi bi-arrow-left me-1" aria-hidden="true"></i> Back to Topics
             </a>
         @endif
     </header>
 
-    @if (! $showTopicPage)
-        @if ($courses->isEmpty())
+    @if (! $showTopicPage || $readOnly)
+        @if (! $readOnly && $courses->isEmpty())
             <div class="alert alert-warning rounded-4 shadow-sm">There are no programs in your assigned college yet. Ask an Admin to add a program first.</div>
         @else
-            <section class="faculty-question-bank__surface mb-4" aria-label="Question Bank program filter">
+            <section class="faculty-question-bank__surface mb-4" aria-label="Question Bank filters">
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 p-3 p-md-4">
-                    <div>
-                        <span class="faculty-question-bank__eyebrow text-primary">Your collection</span>
-                        <h2 class="h5 fw-bold mb-1">Filter by program</h2>
-                        <p class="small text-muted mb-0">Switch programs to organize and manage your questions.</p>
-                    </div>
-                    <form method="GET" action="{{ route('admin.question-bank.index') }}" class="d-flex flex-wrap align-items-center gap-2 faculty-question-bank__filter">
-                        <label class="visually-hidden" for="faculty-question-course">Program filter</label>
-                        <select class="form-select form-select-lg" id="faculty-question-course" name="course_id" onchange="this.form.submit()">
-                            <option value="">All my programs</option>
-                            @foreach($courses as $availableCourse)
-                                <option value="{{ $availableCourse->id }}" @selected($selectedCourseId === $availableCourse->id)>{{ $availableCourse->name }}</option>
-                            @endforeach
-                        </select>
-                        @if ($course !== null)
-                            <button class="btn btn-primary btn-lg rounded-pill px-4 faculty-question-bank__add-button ms-auto" type="button" data-bs-toggle="modal" data-bs-target="#createTopicModal">
-                                <i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Create Topic
-                            </button>
-                        @endif
-                        <noscript><button class="btn btn-outline-primary" type="submit">Apply filter</button></noscript>
-                    </form>
+                    @if ($readOnly)
+                        <div>
+                            <span class="faculty-question-bank__eyebrow text-primary">Academic oversight</span>
+                            <h2 class="h5 fw-bold mb-1">Filter by college and program</h2>
+                            <p class="small text-muted mb-0">
+                                {{ $departments->firstWhere('id', $selectedDepartmentId)?->name ?? 'All colleges' }}
+                                · {{ $course?->name ?? 'All programs' }}
+                            </p>
+                        </div>
+                        <button
+                            class="btn btn-outline-primary rounded-3 faculty-question-bank__filter-trigger"
+                            type="button"
+                            data-bs-toggle="modal"
+                            data-bs-target="#questionBankFilterModal"
+                            data-question-bank-filter-trigger
+                            aria-label="Filter by college and program"
+                            aria-controls="questionBankFilterModal"
+                            aria-expanded="false"
+                            title="Filter by college and program"
+                        >
+                            <i class="bi bi-funnel" aria-hidden="true"></i>
+                        </button>
+                    @else
+                        <div>
+                            <span class="faculty-question-bank__eyebrow text-primary">Your collection</span>
+                            <h2 class="h5 fw-bold mb-1">Filter by program</h2>
+                            <p class="small text-muted mb-0">Browse shared folders and manage your own questions.</p>
+                        </div>
+                        <form method="GET" action="{{ route('admin.question-bank.index') }}" class="d-flex flex-wrap align-items-center gap-2 faculty-question-bank__filter">
+                            <label class="visually-hidden" for="faculty-question-course">Program filter</label>
+                            <select class="form-select form-select-lg" id="faculty-question-course" name="course_id" onchange="this.form.submit()">
+                                <option value="">All my programs</option>
+                                @foreach($courses as $availableCourse)
+                                    <option value="{{ $availableCourse->id }}" @selected($selectedCourseId === $availableCourse->id)>{{ $availableCourse->name }}</option>
+                                @endforeach
+                            </select>
+                            @if ($course !== null)
+                                <button class="btn btn-primary btn-lg rounded-pill px-4 faculty-question-bank__add-button ms-auto" type="button" data-bs-toggle="modal" data-bs-target="#createTopicModal">
+                                    <i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Create Topic
+                                </button>
+                            @endif
+                            <noscript><button class="btn btn-outline-primary" type="submit">Apply filter</button></noscript>
+                        </form>
+                    @endif
                 </div>
             </section>
+            @if ($readOnly)
+                <div class="modal fade" id="questionBankFilterModal" tabindex="-1" aria-labelledby="question-bank-filter-heading" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered question-bank-modal-dialog">
+                        <div class="modal-content question-bank-modal border-0 shadow-lg rounded-4">
+                            <form method="GET" action="{{ route('super-admin.question-bank.index') }}">
+                                <div class="modal-header px-4 pt-4">
+                                    <div>
+                                        <span class="faculty-question-bank__eyebrow text-primary">Refine your results</span>
+                                        <h2 class="modal-title h4 fw-bold mt-1 mb-1" id="question-bank-filter-heading">Filter Question Bank</h2>
+                                        <p class="small text-muted mb-0">Choose a college, then a program. Results update when you apply the filter.</p>
+                                    </div>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body px-4 d-grid gap-3">
+                                    <div>
+                                        <label for="question-bank-department" class="form-label fw-semibold">College</label>
+                                        <select
+                                            class="form-select"
+                                            id="question-bank-department"
+                                            name="department_id"
+                                            aria-label="Filter by college"
+                                        >
+                                            <option value="">Select a college</option>
+                                            @foreach($departments as $department)
+                                                <option value="{{ $department->id }}" @selected($selectedDepartmentId === $department->id)>{{ $department->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="question-bank-course" class="form-label fw-semibold">Program</label>
+                                        <select
+                                            class="form-select"
+                                            id="question-bank-course"
+                                            name="course_id"
+                                            aria-label="Filter by program"
+                                            @disabled($selectedDepartmentId === null)
+                                        >
+                                            <option value="" @selected($selectedCourseId === null)>{{ $selectedDepartmentId === null ? 'Select a college first' : 'Select a program' }}</option>
+                                            @foreach($filterCourses as $availableCourse)
+                                                <option
+                                                    value="{{ $availableCourse->id }}"
+                                                    data-department-id="{{ $availableCourse->department_id }}"
+                                                    @selected($selectedCourseId === $availableCourse->id)
+                                                    @if($availableCourse->department_id !== $selectedDepartmentId) hidden @endif
+                                                >{{ $availableCourse->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="modal-footer justify-content-between px-4 py-3">
+                                    <a href="{{ route('super-admin.question-bank.index') }}" class="btn btn-outline-secondary rounded-pill px-3">Clear filters</a>
+                                    <div class="d-flex gap-2 ms-auto">
+                                        <button class="btn btn-light rounded-pill px-3" type="button" data-bs-dismiss="modal">Cancel</button>
+                                        <button class="btn btn-primary rounded-pill px-4" type="submit">
+                                            <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Apply Filter
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            @endif
         @endif
+    @endif
+
+    @if ($readOnly && ! $showTopicPage && $selectedDepartmentId !== null && $course === null)
+        <div class="alert alert-info rounded-4 shadow-sm" role="status">Choose a program to view its shared topic folders and questions.</div>
     @endif
 
     @if ($course !== null && ! $showTopicPage)
         <section class="mb-4" aria-labelledby="topics-heading">
             <div class="faculty-question-bank__section-heading mb-3">
                 <div>
-                    <span class="faculty-question-bank__eyebrow text-primary">Organize your collection</span>
+                    <span class="faculty-question-bank__eyebrow text-primary">{{ $readOnly ? 'Shared collection' : 'Organize your collection' }}</span>
                     <h2 class="h4 fw-bold mb-1" id="topics-heading">Topic folders</h2>
-                    <p class="small text-muted mb-0">{{ $course->name }} · Open a folder to manage its questions.</p>
+                    <p class="small text-muted mb-0">{{ $course->name }} · Shared with Faculty in this program.</p>
                 </div>
             </div>
             @if ($topics->isNotEmpty())
@@ -451,7 +558,9 @@
                     @foreach ($topics as $topic)
                         <a
                             class="faculty-question-bank__topic-card faculty-question-bank__topic-card-link"
-                            href="{{ route('admin.question-bank.topics.show', $topic) }}"
+                            href="{{ $readOnly
+                                ? route('super-admin.question-bank.index', ['department_id' => $selectedDepartmentId, 'course_id' => $course->id, 'topic_id' => $topic->id])
+                                : route('admin.question-bank.topics.show', $topic) }}"
                             aria-label="Open {{ $topic->name }} topic folder"
                         >
                             <span class="d-flex align-items-center justify-content-between gap-3">
@@ -462,7 +571,12 @@
                                 <span class="badge rounded-pill text-bg-primary">{{ $topic->questions_count }}</span>
                             </span>
                             <span class="d-flex align-items-center justify-content-between gap-2">
-                                <span class="small text-muted">{{ $topic->questions_count === 1 ? '1 question' : $topic->questions_count.' questions' }}</span>
+                                <span class="small text-muted">
+                                    {{ $topic->questions_count === 1 ? '1 question' : $topic->questions_count.' questions' }}
+                                    @if ($topic->createdBy)
+                                        · Created by {{ $topic->createdBy->name }}
+                                    @endif
+                                </span>
                                 <span class="small text-primary fw-semibold text-nowrap">Open folder <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i></span>
                             </span>
                         </a>
@@ -470,11 +584,16 @@
                 </div>
             @else
                 <div class="faculty-question-bank__surface p-4 text-center text-muted">
-                    No topics yet. Create the first topic for {{ $course->name }}.
+                    @if ($readOnly)
+                        No shared topic folders have been created for {{ $course->name }} yet.
+                    @else
+                        No topics yet. Create the first topic for {{ $course->name }}.
+                    @endif
                 </div>
             @endif
         </section>
 
+        @if (! $readOnly)
         <div class="modal fade" id="createTopicModal" tabindex="-1" aria-labelledby="create-topic-heading" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered question-bank-modal-dialog">
                 <div class="modal-content question-bank-modal border-0 shadow-lg rounded-4">
@@ -511,6 +630,7 @@
                 </div>
             </div>
         </div>
+        @endif
     @endif
 
     @if ($showTopicPage && $selectedTopic !== null)
@@ -518,19 +638,26 @@
             <div class="d-flex align-items-center gap-3">
                 <i class="bi bi-folder2-open faculty-question-bank__topic-icon" aria-hidden="true"></i>
                 <div>
-                    <span class="faculty-question-bank__eyebrow text-primary">{{ $course->name }} · Topic folder</span>
+                    <span class="faculty-question-bank__eyebrow text-primary">
+                        {{ $course->name }} · Shared folder
+                        @if ($selectedTopic->createdBy)
+                            · Created by {{ $selectedTopic->createdBy->name }}
+                        @endif
+                    </span>
                     <h2 class="h4 fw-bold mb-0">{{ $selectedTopic->name }}</h2>
                 </div>
             </div>
+            @if (! $readOnly && $selectedTopic->created_by === auth()->id())
             <div class="d-flex flex-wrap gap-2">
                 <button class="btn btn-outline-secondary rounded-pill px-3" type="button" data-bs-toggle="modal" data-bs-target="#editTopicModal{{ $selectedTopic->id }}">
                     <i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit folder
                 </button>
+                @if (! $topicHasOtherFacultyQuestions)
                 <form
                     action="{{ route('admin.question-bank.topics.destroy', $selectedTopic) }}"
                     method="POST"
                     data-confirm-title="Delete this topic folder?"
-                    data-confirm-message="All bank questions inside it will be deleted. Existing exam copies remain unchanged."
+                    data-confirm-message="Your questions in this folder will be deleted. Existing exam copies remain unchanged."
                     data-confirm-button="Delete folder"
                 >
                     @csrf
@@ -539,12 +666,19 @@
                         <i class="bi bi-trash3 me-1" aria-hidden="true"></i>Delete folder
                     </button>
                 </form>
+                @endif
             </div>
+            @endif
         </section>
-        @include('admin.question-bank.partials.topic-edit-modal', ['topic' => $selectedTopic])
+        @if (! $readOnly && $selectedTopic->created_by === auth()->id())
+            @if ($topicHasOtherFacultyQuestions)
+                <p class="small text-muted mb-3">This folder contains questions from other Faculty, so it cannot be deleted.</p>
+            @endif
+            @include('admin.question-bank.partials.topic-edit-modal', ['topic' => $selectedTopic])
+        @endif
     @endif
 
-    @if ($selectedTopic !== null)
+    @if ($selectedTopic !== null && ! $readOnly)
         <div class="modal fade" id="createQuestionModal" tabindex="-1" aria-labelledby="create-question-heading" aria-hidden="true">
             <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable question-bank-modal-dialog">
                 <div class="modal-content question-bank-modal border-0 shadow-lg rounded-4">
@@ -619,7 +753,9 @@
             <div>
                 <span class="faculty-question-bank__eyebrow text-primary">Question collection</span>
                 <h2 class="h3 fw-bold mb-1" id="bank-items-heading">{{ $selectedTopic?->name ?? ($course?->name ?? 'My questions') }}</h2>
-                <p class="small text-muted mb-0">Editing or removing a bank item does not change questions already copied into an exam.</p>
+                <p class="small text-muted mb-0">
+                    {{ $readOnly ? 'Questions are shared across Faculty in this program. Disabled questions cannot be added to future exams.' : 'Questions are shared across Faculty in this program. You can edit or remove only questions you created.' }}
+                </p>
             </div>
             <div class="d-flex align-items-center gap-3">
                 @if ($selectedTopic !== null)
@@ -640,34 +776,42 @@
                             <li>
                                 <a
                                     class="dropdown-item {{ $selectedDifficulty === null ? 'active' : '' }}"
-                                    href="{{ route('admin.question-bank.topics.show', ['topic' => $selectedTopic->id]) }}"
+                                    href="{{ $readOnly
+                                        ? route('super-admin.question-bank.index', ['department_id' => $selectedDepartmentId, 'course_id' => $course->id, 'topic_id' => $selectedTopic->id])
+                                        : route('admin.question-bank.topics.show', ['topic' => $selectedTopic->id]) }}"
                                 >All difficulties</a>
                             </li>
                             @foreach (['easy' => 'Easy', 'medium' => 'Moderate', 'hard' => 'Hard'] as $value => $label)
                                 <li>
                                     <a
                                         class="dropdown-item {{ $selectedDifficulty === $value ? 'active' : '' }}"
-                                        href="{{ route('admin.question-bank.topics.show', ['topic' => $selectedTopic->id, 'difficulty' => $value]) }}"
+                                        href="{{ $readOnly
+                                            ? route('super-admin.question-bank.index', ['department_id' => $selectedDepartmentId, 'course_id' => $course->id, 'topic_id' => $selectedTopic->id, 'difficulty' => $value])
+                                            : route('admin.question-bank.topics.show', ['topic' => $selectedTopic->id, 'difficulty' => $value]) }}"
                                     >{{ $label }}</a>
                                 </li>
                             @endforeach
                         </ul>
                     </div>
-                    <button class="btn btn-primary rounded-pill px-4 faculty-question-bank__add-button" type="button" data-bs-toggle="modal" data-bs-target="#createQuestionModal">
-                        <i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Create Question
-                    </button>
+                    @if (! $readOnly)
+                        <button class="btn btn-primary rounded-pill px-4 faculty-question-bank__add-button" type="button" data-bs-toggle="modal" data-bs-target="#createQuestionModal">
+                            <i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Create Question
+                        </button>
+                    @endif
                 @endif
             </div>
         </div>
 
         <div class="faculty-question-bank__question-grid">
         @forelse ($items as $item)
+            @php($canManageQuestion = ! $readOnly && $item->author_id === auth()->id())
             <article class="faculty-question-bank__question mb-3">
                 <div class="d-flex align-items-center justify-content-between gap-3 p-3 p-md-4">
                     <div class="d-flex align-items-start gap-3">
                         <span class="faculty-question-bank__question-number" aria-hidden="true"><i class="bi bi-patch-question"></i></span>
                         <div>
                             <span class="badge rounded-pill text-bg-light mb-2">{{ $selectedTopic->name }}</span>
+                            <div class="small text-muted mb-1">Added by {{ $item->author?->name ?? 'Former Faculty' }}</div>
                             <span class="badge rounded-pill {{ $item->difficulty === 'hard' ? 'text-bg-danger' : ($item->difficulty === 'easy' ? 'text-bg-success' : 'text-bg-warning') }} mb-2">{{ $item->difficulty === 'medium' ? 'Moderate' : ucfirst($item->difficulty ?? 'moderate') }}</span>
                             <span class="badge rounded-pill {{ $item->is_active ? 'text-bg-success' : 'text-bg-secondary' }} mb-2">{{ $item->is_active ? 'Enabled' : 'Disabled' }} for new exams</span>
                             <h3 class="faculty-question-bank__question-text h6 fw-semibold text-break mb-1">{{ $item->question }}</h3>
@@ -680,7 +824,8 @@
                         </div>
                     </div>
                     <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 flex-shrink-0">
-                        <form action="{{ route('admin.question-bank.status', $item) }}" method="POST">
+                        @if ($readOnly || $canManageQuestion)
+                        <form action="{{ route($readOnly ? 'super-admin.question-bank.status' : 'admin.question-bank.status', $item) }}" method="POST">
                             @csrf
                             @method('PATCH')
                             <input type="hidden" name="is_active" value="{{ $item->is_active ? '0' : '1' }}">
@@ -689,6 +834,7 @@
                                 <span>{{ $item->is_active ? 'Disable' : 'Enable' }}</span>
                             </button>
                         </form>
+                        @endif
                         <button
                             type="button"
                             class="btn btn-outline-primary rounded-pill flex-shrink-0 px-3"
@@ -741,13 +887,18 @@
                             </ol>
                         </div>
                         <div class="modal-footer justify-content-between">
+                            @if ($canManageQuestion)
                             <form action="{{ route('admin.question-bank.destroy', $item) }}" method="POST" data-confirm-title="Remove this question from the bank?" data-confirm-message="Existing examinations will not change." data-confirm-button="Remove question">
                                 @csrf
                                 @method('DELETE')
                                 <button class="btn btn-outline-danger" type="submit">Delete</button>
                             </form>
+                            @else
+                                <span></span>
+                            @endif
                             <div class="d-flex gap-2">
                                 <button class="btn btn-light" type="button" data-bs-dismiss="modal">Close</button>
+                                @if ($canManageQuestion)
                                 <button
                                     class="btn btn-primary"
                                     type="button"
@@ -755,12 +906,14 @@
                                 >
                                     Edit
                                 </button>
+                                @endif
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
+            @if ($canManageQuestion)
             <div class="modal fade" id="editQuestionModal{{ $item->id }}" tabindex="-1" aria-labelledby="editQuestionModalLabel{{ $item->id }}" aria-hidden="true">
                             <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable question-bank-modal-dialog">
                                 <div class="modal-content question-bank-modal border-0 shadow-lg rounded-4">
@@ -834,11 +987,14 @@
                                 </div>
                             </div>
             </div>
+            @endif
         @empty
             <div class="faculty-question-bank__surface p-4 p-md-5 text-center">
                 <span class="faculty-question-bank__question-number mb-3"><i class="bi bi-journal-plus" aria-hidden="true"></i></span>
                 <h3 class="h5 fw-bold">No questions in this topic yet</h3>
-                <p class="text-muted mb-0">Add the first question to {{ $selectedTopic->name }}.</p>
+                <p class="text-muted mb-0">
+                    {{ $readOnly ? 'No questions are stored in this shared folder yet.' : 'Add the first question to '.$selectedTopic->name.'.' }}
+                </p>
             </div>
         @endforelse
         </div>
@@ -846,7 +1002,7 @@
     </section>
     @endif
 </div>
-@if ($errors->any())
+@if ($errors->any() && ! $readOnly)
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const formContext = @json(old('form_context', 'create'));
@@ -864,6 +1020,39 @@
 @endif
 <script>
     document.addEventListener('DOMContentLoaded', () => {
+        const filterModal = document.getElementById('questionBankFilterModal');
+        const filterTrigger = document.querySelector('[data-question-bank-filter-trigger]');
+        const departmentFilter = document.getElementById('question-bank-department');
+        const programFilter = document.getElementById('question-bank-course');
+
+        if (filterModal && filterTrigger && departmentFilter && programFilter) {
+            const programOptions = Array.from(programFilter.options)
+                .filter((option) => option.dataset.departmentId);
+            const programPlaceholder = programFilter.querySelector('option[value=""]');
+            const updateProgramOptions = (resetProgram = false) => {
+                const departmentId = departmentFilter.value;
+
+                programOptions.forEach((option) => {
+                    option.hidden = option.dataset.departmentId !== departmentId;
+                });
+
+                if (resetProgram || (
+                    programFilter.value !== ''
+                    && programFilter.selectedOptions[0]?.dataset.departmentId !== departmentId
+                )) {
+                    programFilter.value = '';
+                }
+
+                programFilter.disabled = departmentId === '';
+                programPlaceholder.textContent = departmentId ? 'Select a program' : 'Select a college first';
+            };
+
+            departmentFilter.addEventListener('change', () => updateProgramOptions(true));
+            filterModal.addEventListener('shown.bs.modal', () => filterTrigger.setAttribute('aria-expanded', 'true'));
+            filterModal.addEventListener('hidden.bs.modal', () => filterTrigger.setAttribute('aria-expanded', 'false'));
+            updateProgramOptions();
+        }
+
         document.querySelectorAll('[data-question-image-preview]').forEach((input) => {
             input.addEventListener('change', () => {
                 const preview = document.getElementById(input.dataset.questionImagePreview);

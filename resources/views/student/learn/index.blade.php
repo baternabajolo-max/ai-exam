@@ -171,8 +171,8 @@
         {{-- Header & Search --}}
         <div class="row align-items-center mb-4 g-3">
             <div class="col-md-6">
-                <h1 class="h3 fw-bold mb-1 text-dark">Learning Modules</h1>
-                <p class="text-muted mb-0 small">Select a module to start reviewing the topics.</p>
+                <h1 class="h3 fw-bold mb-1 text-dark">Modules</h1>
+                <p class="text-muted mb-0 small">Select a module to start reviewing its topics.</p>
             </div>
 
             <div class="col-md-6">
@@ -182,7 +182,7 @@
                         <input type="text" 
                                name="search" 
                                class="form-control bg-white border-0 shadow-sm ps-5 py-2" 
-                               placeholder="Search modules..." 
+                               placeholder="Search modules..."
                                value="{{ $search ?? '' }}"
                                aria-label="Search modules">
                         @if(!empty($search))
@@ -214,7 +214,7 @@
                 <a href="{{ route('student.tests.generate-general') }}"
                    data-ai-loading
                    data-ai-loading-title="Preparing your general test"
-                   data-ai-loading-message="Setting up your personalized assessment. The AI will generate questions from your course materials next."
+                   data-ai-loading-message="Setting up your personalized assessment. The AI will generate questions from your module materials next."
                    class="btn btn-primary rounded-pill px-4 py-2 fw-medium shadow-sm d-inline-flex align-items-center gap-2 text-nowrap">
                     <i class="bi bi-clipboard2-check"></i>
                     <span>Take general test</span>
@@ -240,7 +240,7 @@
                             <p class="module-description">{{ $module->description ?? 'No description provided.' }}</p>
                             
                             <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
-                                <span class="text-muted small">Course review</span>
+                                <span class="text-muted small">Module review</span>
                                 <span class="module-action-link text-primary small">
                                     <span>Explore Topics</span>
                                     <i class="bi bi-arrow-right"></i>
@@ -261,7 +261,7 @@
                                 @if(!empty($search))
                                     No modules matched your search term "{{ $search }}".
                                 @else
-                                    There are currently no learning modules available.
+                                    There are currently no modules available.
                                 @endif
                             </p>
                             @if(!empty($search))

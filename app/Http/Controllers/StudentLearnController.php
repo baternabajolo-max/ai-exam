@@ -6,6 +6,7 @@ use App\Jobs\ProcessMathPdfJob;
 use App\Models\Module;
 use App\Models\Question;
 use App\Models\Result;
+use App\Models\StudySession;
 use App\Models\Subtopic;
 use App\Models\Test;
 use App\Services\AiService;
@@ -80,8 +81,26 @@ class StudentLearnController extends Controller
             })
             ->latest()
             ->get();
+        $studyTimeSeconds = (int) StudySession::query()
+            ->where('user_id', auth()->id())
+            ->where('subtopic_id', $subtopic->id)
+            ->sum('active_seconds');
+        $hasTopicQuizAttempt = Result::query()
+            ->where('user_id', auth()->id())
+            ->whereHas('test', fn ($query) => $query
+                ->where('subtopic_id', $subtopic->id)
+                ->where('is_general', false))
+            ->exists();
 
-        return view('student.learn.review', compact('subtopic', 'pdfText', 'flashcards', 'isPdf', 'reviewerUrl'));
+        return view('student.learn.review', compact(
+            'subtopic',
+            'pdfText',
+            'flashcards',
+            'isPdf',
+            'reviewerUrl',
+            'studyTimeSeconds',
+            'hasTopicQuizAttempt',
+        ));
     }
 
     public function extractionStatus(Subtopic $subtopic): JsonResponse

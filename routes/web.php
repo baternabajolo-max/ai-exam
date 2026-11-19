@@ -107,6 +107,7 @@ Route::middleware(['auth', 'role:super-admin'])->prefix('super-admin')->name('su
     Route::get('/students/{student}/results/{result}', [StudentResultController::class, 'adminShow'])->name('students.results.show');
     Route::post('/students/{student}/tests/{test}/retake', [AdminController::class, 'activateExamRetake'])->name('students.tests.retake');
     Route::get('/question-bank', [QuestionBankController::class, 'adminIndex'])->name('question-bank.index');
+    Route::patch('/question-bank/{questionBankItem}/status', [QuestionBankController::class, 'updateStatus'])->name('question-bank.status');
     Route::get('/item-analysis', [ItemAnalysisController::class, 'adminIndex'])->name('item-analysis.index');
     Route::get('/profile', [SuperAdminController::class, 'profile'])->name('profile');
     Route::put('/profile', [AccountController::class, 'update'])->name('profile.update');
@@ -157,6 +158,7 @@ Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')
     Route::get('/activity/topics/{subtopic}/quizzes', [StudentActivityController::class, 'topicQuizzes'])->name('activity.topics.quizzes');
     Route::post('/activity/sessions', [StudentActivityController::class, 'store'])->name('activity.sessions.store');
     Route::post('/activity/sessions/{studySession}/heartbeat', [StudentActivityController::class, 'heartbeat'])->name('activity.sessions.heartbeat');
+    Route::post('/study-heartbeat', [StudentActivityController::class, 'heartbeatCurrent'])->name('study-heartbeat');
     Route::post('/activity/sessions/{studySession}/stop', [StudentActivityController::class, 'stop'])->name('activity.sessions.stop');
 
     Route::get('/tests', [StudentTestController::class, 'index'])->name('tests.index');
@@ -232,6 +234,12 @@ Route::middleware(['auth', 'role:admin', TrackFacultyActivity::class])->prefix('
     Route::get('/modules', [ModuleController::class, 'index'])->name('modules.index');
     Route::post('/modules', [ModuleController::class, 'store'])->name('modules.store');
     Route::get('/modules/{module}', [ModuleController::class, 'show'])->name('modules.show');
+    Route::get('/modules/{module}/students/{student}/overview', [StudentActivityController::class, 'adminModuleStudentOverview'])
+        ->name('modules.students.overview');
+    Route::get('/modules/{module}/students/{student}/activity', [StudentActivityController::class, 'adminModuleStudentActivity'])
+        ->name('modules.students.activity');
+    Route::post('/modules/{module}/students/{student}/notifications', [ModuleController::class, 'sendStudentNotice'])
+        ->name('modules.students.notifications.store');
     Route::delete('/modules/{module}', [ModuleController::class, 'destroy'])->name('modules.destroy');
 
     // Subtopic Management (File Uploads & Edits)

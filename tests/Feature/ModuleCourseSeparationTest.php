@@ -6,7 +6,11 @@ use App\Jobs\ProcessMathPdfJob;
 use App\Models\Course;
 use App\Models\Department;
 use App\Models\Module;
+use App\Models\Result;
+use App\Models\StudentNotification;
+use App\Models\StudySession;
 use App\Models\Subtopic;
+use App\Models\Test as StudentTest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -33,9 +37,11 @@ class ModuleCourseSeparationTest extends TestCase
 
         $this->actingAs($admin)
             ->get(route('admin.modules.index'))
-            ->assertSee('Choose Course')
+            ->assertSee('Modules')
+            ->assertSee('Choose Program')
             ->assertSee($otherCourse->name)
-            ->assertSee('Add New Module');
+            ->assertSee('Add New Module')
+            ->assertDontSee('Courses');
 
         $this->post(route('admin.modules.store'), ['title' => 'Software Foundations', 'course_id' => $course->id])
             ->assertRedirect(route('admin.modules.index', ['course_id' => $course->id]));
@@ -52,7 +58,8 @@ class ModuleCourseSeparationTest extends TestCase
         ]);
 
         $this->get(route('admin.modules.index'))
-            ->assertSee('Choose Course')
+            ->assertSee('Modules')
+            ->assertSee('Choose Program')
             ->assertSee('Add New Module')
             ->assertSee('id="createModuleModal"', false)
             ->assertSee('Software Foundations')
@@ -101,7 +108,7 @@ class ModuleCourseSeparationTest extends TestCase
             ->assertSee('Software Design')
             ->assertDontSee($otherModule->title)
             ->assertSee('Software Engineering')
-            ->assertDontSee('Choose Course');
+            ->assertDontSee('Choose Program');
     }
 
     public function test_module_management_modals_are_outside_transformed_containers(): void
@@ -133,16 +140,219 @@ class ModuleCourseSeparationTest extends TestCase
             ->assertSee('id="editSubtopicModal'.$subtopic->id.'"', false)
             ->assertSee('data-reviewer-upload', false)
             ->assertSee('id="reviewer-upload-progress"', false)
-            ->assertSee('Uploading subtopic material')
+            ->assertSee('Uploading topic material')
             ->assertSee('Please wait while your reviewer file is uploaded.')
-            ->assertSee('data-confirm-title="Delete this subtopic?"', false)
-            ->assertSee('data-confirm-button="Delete subtopic"', false)
+            ->assertSee('data-confirm-title="Delete this topic?"', false)
+            ->assertSee('data-confirm-button="Delete topic"', false)
+            ->assertSee('Back to Modules')
+            ->assertSee('aria-label="Module details"', false)
+            ->assertSee('No description provided for this module.')
+            ->assertSee('Leaderboards')
+            ->assertSee('Student Study Activity')
+            ->assertSee('Search student')
+            ->assertSee('Filter by Topic')
+            ->assertSee('Topics Completed')
+            ->assertSee('Counts active reading time after at least one quiz attempt', false)
+            ->assertSee('Completed requires at least 5 minutes of active study', false)
+            ->assertSee('Shows the average across quiz attempts', false)
+            ->assertSee('Most recent review session or quiz attempt.', false)
+            ->assertSee('${data.topics_completed} / ${data.topic_count} Topics', false)
+            ->assertSee('data-bs-container="body"', false)
+            ->assertSee('moduleTopicBreakdownRows', false)
+            ->assertSee('moduleTopicAttemptRows', false)
+            ->assertSee('Topics Breakdown')
+            ->assertSee('id="moduleActivityDrilldownTabs"', false)
+            ->assertSee('data-activity-stage="days" disabled', false)
+            ->assertSee('data-activity-stage="topics" disabled', false)
+            ->assertSee('Minutes (min)')
+            ->assertSee('Hours (h)')
+            ->assertSee('function selectActivityMonth', false)
+            ->assertSee('function selectActivityDate', false)
             ->assertSee('js/confirm-actions.js')
             ->assertDontSee('if (!confirm(', false)
             ->assertDontSee('data-ai-loading-title="Saving reviewer"', false)
             ->assertDontSee('data-ai-loading-title="Uploading reviewer"', false)
             ->assertSee(route('admin.subtopics.update', $subtopic), false);
         $this->assertModalIsOutsideTransformedContainers($modulePage, 'editSubtopicModal'.$subtopic->id);
+        $this->assertModalIsOutsideTransformedContainers($modulePage, 'moduleStudentActivityModal');
+        $this->assertModalIsOutsideTransformedContainers($modulePage, 'moduleStudentNoticeModal');
+    }
+
+    public function test_module_detail_ranks_all_students_by_quiz_points_and_verified_review_time(): void
+    {
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
+        $admin = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $quizStudent = User::factory()->create([
+            'name' => 'Quiz Student',
+            'role' => 'student',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $zeroPointStudent = User::factory()->create([
+            'name' => 'Zero Point Student',
+            'role' => 'student',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $module = Module::create(['title' => 'Database Systems', 'department_id' => $department->id, 'course_id' => $course->id]);
+        $verifiedTopic = Subtopic::create(['module_id' => $module->id, 'title' => 'Normalization']);
+        $unverifiedTopic = Subtopic::create(['module_id' => $module->id, 'title' => 'SQL Queries']);
+        $quiz = StudentTest::create([
+            'title' => 'Normalization Quiz',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+            'subtopic_id' => $verifiedTopic->id,
+            'is_general' => false,
+        ]);
+        Result::create([
+            'user_id' => $quizStudent->id,
+            'test_id' => $quiz->id,
+            'score' => 8,
+            'total_questions' => 10,
+        ]);
+        Result::create([
+            'user_id' => $quizStudent->id,
+            'test_id' => $quiz->id,
+            'score' => 10,
+            'total_questions' => 10,
+        ]);
+
+        StudySession::create([
+            'user_id' => $quizStudent->id,
+            'module_id' => $module->id,
+            'subtopic_id' => $verifiedTopic->id,
+            'activity_date' => now()->toDateString(),
+            'active_seconds' => 3600,
+            'started_at' => now()->subHour(),
+            'last_heartbeat_at' => now(),
+        ]);
+        StudySession::create([
+            'user_id' => $quizStudent->id,
+            'module_id' => $module->id,
+            'subtopic_id' => $unverifiedTopic->id,
+            'activity_date' => now()->toDateString(),
+            'active_seconds' => 1800,
+            'started_at' => now()->subHour(),
+            'last_heartbeat_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.modules.show', $module))
+            ->assertOk()
+            ->assertSee('90.00 pts')
+            ->assertSee('90.00%')
+            ->assertSee('Quiz Student')
+            ->assertSee('Zero Point Student')
+            ->assertSee('30m')
+            ->assertSee('No attempts')
+            ->assertSee('data-notice-preset="Great study progress!"', false);
+    }
+
+    public function test_module_detail_embeds_topic_specific_points_and_verified_time_for_filters(): void
+    {
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
+        $admin = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $student = User::factory()->create([
+            'role' => 'student',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $module = Module::create(['title' => 'Database Systems', 'department_id' => $department->id, 'course_id' => $course->id]);
+        $normalization = Subtopic::create(['module_id' => $module->id, 'title' => 'Normalization']);
+        $sqlQueries = Subtopic::create(['module_id' => $module->id, 'title' => 'SQL Queries']);
+
+        foreach ([
+            [$normalization, 8, 600],
+            [$sqlQueries, 4, 900],
+        ] as [$topic, $score, $activeSeconds]) {
+            $quiz = StudentTest::create([
+                'title' => "{$topic->title} Quiz",
+                'department_id' => $department->id,
+                'course_id' => $course->id,
+                'subtopic_id' => $topic->id,
+                'is_general' => false,
+            ]);
+            Result::create([
+                'user_id' => $student->id,
+                'test_id' => $quiz->id,
+                'score' => $score,
+                'total_questions' => 10,
+            ]);
+            StudySession::create([
+                'user_id' => $student->id,
+                'module_id' => $module->id,
+                'subtopic_id' => $topic->id,
+                'activity_date' => now()->toDateString(),
+                'active_seconds' => $activeSeconds,
+                'started_at' => now()->subMinutes($activeSeconds / 60),
+                'last_heartbeat_at' => now(),
+            ]);
+        }
+
+        $response = $this->actingAs($admin)->get(route('admin.modules.show', $module));
+        $response
+            ->assertSee('Filter by Topic')
+            ->assertSee('All Topics')
+            ->assertSee($normalization->title)
+            ->assertSee($sqlQueries->title);
+
+        preg_match('/data-topic-stats="([^"]+)"/', $response->getContent(), $matches);
+        $topicStats = json_decode(
+            html_entity_decode($matches[1] ?? '', ENT_QUOTES | ENT_HTML5),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+
+        $this->assertSame(40, $topicStats[$normalization->id]['points']);
+        $this->assertSame(600, $topicStats[$normalization->id]['verified_seconds']);
+        $this->assertSame(20, $topicStats[$sqlQueries->id]['points']);
+        $this->assertSame(900, $topicStats[$sqlQueries->id]['verified_seconds']);
+    }
+
+    public function test_faculty_can_send_a_one_way_module_notice_only_to_an_enrolled_student(): void
+    {
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $otherDepartment = Department::create(['name' => 'Education', 'code' => 'EDU']);
+        $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
+        $otherCourse = Course::create(['name' => 'Teaching', 'code' => 'TEACH', 'department_id' => $otherDepartment->id]);
+        $admin = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $student = User::factory()->create([
+            'role' => 'student',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $foreignStudent = User::factory()->create([
+            'role' => 'student',
+            'department_id' => $otherDepartment->id,
+            'course_id' => $otherCourse->id,
+        ]);
+        $module = Module::create(['title' => 'Database Systems', 'department_id' => $department->id, 'course_id' => $course->id]);
+
+        $this->actingAs($admin)
+            ->post(route('admin.modules.students.notifications.store', [
+                'module' => $module,
+                'student' => $student,
+            ]), ['message' => 'Great study progress!'])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('student_notifications', [
+            'student_id' => $student->id,
+            'admin_id' => $admin->id,
+            'subject' => $module->title,
+            'message' => 'Great study progress!',
+            'read_at' => null,
+        ]);
+
+        $this->post(route('admin.modules.students.notifications.store', [
+            'module' => $module,
+            'student' => $foreignStudent,
+        ]), ['message' => 'Unauthorized notice'])
+            ->assertNotFound();
+
+        $this->assertSame(1, StudentNotification::count());
     }
 
     public function test_admin_can_upload_reviewer_files_up_to_75_mb_and_larger_files_are_rejected(): void
@@ -235,7 +445,8 @@ class ModuleCourseSeparationTest extends TestCase
 
         $this->actingAs($admin)
             ->get(route('admin.modules.index'))
-            ->assertSee('Choose Course')
+            ->assertSee('Modules')
+            ->assertSee('Choose Program')
             ->assertSee('Add New Module')
             ->assertSee('id="createModuleModal"', false)
             ->assertSee($module->title)
@@ -381,12 +592,19 @@ class ModuleCourseSeparationTest extends TestCase
 
         $this->actingAs($student)
             ->get(route('student.learn.index'))
+            ->assertSee('Modules')
+            ->assertSee('Search modules...')
+            ->assertDontSee('Courses')
             ->assertSee($softwareModule->title)
             ->assertDontSee($unassignedModule->title)
             ->assertDontSee($informationModule->title);
 
         $this->get(route('student.learn.show', $informationModule))
             ->assertNotFound();
+
+        $this->get(route('student.learn.show', $softwareModule))
+            ->assertSee('Back to all modules')
+            ->assertSee('No description provided for this module.');
 
         $this->get(route('student.learn.show', $unassignedModule))
             ->assertNotFound();

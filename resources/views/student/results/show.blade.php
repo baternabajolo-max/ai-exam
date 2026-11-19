@@ -233,7 +233,7 @@
                     <a href="{{ route('student.tests.generate-general') }}"
                        data-ai-loading
                        data-ai-loading-title="Preparing your general test"
-                       data-ai-loading-message="Setting up your personalized assessment. The AI will generate questions from your course materials next."
+                       data-ai-loading-message="Setting up your personalized assessment. The AI will generate questions from your module materials next."
                        class="btn btn-emerald-primary rounded-pill px-5 py-2.5 fw-semibold shadow-sm d-inline-flex align-items-center gap-2">
                         <span>Take test again</span>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">

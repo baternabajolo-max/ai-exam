@@ -791,7 +791,7 @@ class RoleDashboardAnalyticsTest extends TestCase
             ->assertOk()
             ->assertSee('Institution oversight')
             ->assertSee('Faculty accounts')
-            ->assertSee('Academic program association, individual Question Bank size')
+            ->assertSee('Academic program association, shared Question Bank contributions')
             ->assertSee('Recent exam submissions')
             ->assertSee(route('super-admin.question-bank.index'))
             ->assertSee(route('super-admin.item-analysis.index'))

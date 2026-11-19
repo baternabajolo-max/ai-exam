@@ -318,7 +318,7 @@
                         <a href="{{ route('student.tests.generate-general') }}"
                            data-ai-loading
                            data-ai-loading-title="Preparing your general test"
-                           data-ai-loading-message="Setting up your personalized assessment. The AI will generate questions from your course materials next."
+                           data-ai-loading-message="Setting up your personalized assessment. The AI will generate questions from your module materials next."
                            class="btn btn-indigo px-4 py-2.5 rounded-pill fw-semibold shadow-sm d-inline-flex align-items-center gap-2">
                             <span>Take Another General Test</span>
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
@@ -332,7 +332,7 @@
                             <a href="{{ route('student.learn.quiz', ['subtopic' => $currentSubtopic->id, 'question_type' => $test->question_type]) }}"
                                data-ai-loading
                                data-ai-loading-title="Preparing your {{ $test->question_type === 'identification' ? 'identification' : 'multiple-choice' }} quiz"
-                               data-ai-loading-message="The AI is creating questions from this subtopic's reviewer material. This may take a moment."
+                               data-ai-loading-message="The AI is creating questions from this topic's reviewer material. This may take a moment."
                                class="btn btn-indigo px-4 py-2.5 rounded-pill fw-semibold shadow-sm d-inline-flex align-items-center gap-2">
                                 <span>Take Another Quiz</span>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>

@@ -141,7 +141,7 @@
 {{-- ========================================================================= --}}
 <div id="test-status-overlay" 
      data-preparing-title="{{ $test->is_general ? 'AI is generating your general test' : 'AI is generating your topic quiz' }}"
-     data-preparing-message="{{ $test->is_general ? 'The AI is generating 30 personalized questions from your available course modules and subtopics. This may take a moment.' : 'The AI is generating 20 practice questions about ' . $test->topic . ' from your reviewer material. This may take a moment.' }}"
+     data-preparing-message="{{ $test->is_general ? 'The AI is generating 30 personalized questions from your available modules and topics. This may take a moment.' : 'The AI is generating 20 practice questions about ' . $test->topic . ' from your reviewer material. This may take a moment.' }}"
      data-evaluating-message="{{ $test->is_general ? 'Your responses are being scored, and the AI is preparing personalized guidance based on your results.' : 'Your responses are being scored and your results are being saved.' }}"
      class="position-fixed top-0 start-0 w-100 h-100 {{ $test->questions->count() === 0 ? 'd-flex' : 'd-none' }} justify-content-center align-items-center bg-slate-900 bg-opacity-75" 
      role="dialog" aria-modal="true" aria-labelledby="test-status-title" aria-describedby="test-status-message"
@@ -152,7 +152,7 @@
             {{ $test->questions->count() === 0 ? ($test->is_general ? 'AI is generating your general test' : 'AI is generating your topic quiz') : 'Checking your answers' }}
         </h2>
         <p class="text-muted small mb-0 lh-lg" id="test-status-message">
-            {{ $test->questions->count() === 0 ? ($test->is_general ? 'The AI is generating 30 personalized questions from your available course modules and subtopics. This may take a moment.' : 'The AI is generating 20 practice questions about ' . $test->topic . ' from your reviewer material. This may take a moment.') : ($test->is_general ? 'Your responses are being scored, and the AI is preparing personalized guidance based on your results.' : 'Your responses are being scored and your results are being saved.') }}
+            {{ $test->questions->count() === 0 ? ($test->is_general ? 'The AI is generating 30 personalized questions from your available modules and topics. This may take a moment.' : 'The AI is generating 20 practice questions about ' . $test->topic . ' from your reviewer material. This may take a moment.') : ($test->is_general ? 'Your responses are being scored, and the AI is preparing personalized guidance based on your results.' : 'Your responses are being scored and your results are being saved.') }}
         </p>
         
         <div id="test-generation-error" class="d-none mt-4" role="alert">

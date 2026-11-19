@@ -75,6 +75,16 @@
             position: relative;
         }
 
+        :root {
+            --role-sidebar-expanded-width: 16.5rem;
+            --role-sidebar-collapsed-width: 4.75rem;
+            --role-sidebar-width: var(--role-sidebar-expanded-width);
+        }
+
+        html.role-sidebar-collapsed {
+            --role-sidebar-width: var(--role-sidebar-collapsed-width);
+        }
+
         .navbar-nav .nav-link {
             white-space: nowrap;
         }
@@ -83,11 +93,15 @@
             .role-sidebar-navbar {
                 height: 3.75rem;
                 min-height: 3.75rem;
+                position: fixed !important;
+                inset: 0 0 auto;
+                width: 100%;
                 z-index: 1030;
             }
 
             .role-sidebar-navbar .container-fluid {
                 min-height: 0;
+                gap: .5rem;
             }
 
             .role-sidebar-navbar .navbar-toggler {
@@ -116,15 +130,68 @@
                 padding: 1rem .75rem;
                 position: fixed;
                 top: 3.75rem;
-                width: 16.5rem;
+                transition: width .22s ease-out, padding .22s ease-out;
+                width: var(--role-sidebar-width);
                 z-index: 1020;
             }
 
             .role-sidebar-navbar .navbar-nav.me-auto .nav-link {
+                align-items: center;
                 border-radius: .75rem;
+                display: flex;
+                gap: .75rem;
+                min-height: 2.75rem;
                 padding: .65rem .8rem;
                 text-align: left;
                 white-space: normal;
+            }
+
+            .role-sidebar-navbar .sidebar-nav-icon {
+                align-items: center;
+                display: inline-flex;
+                flex: 0 0 1.25rem;
+                font-size: 1.05rem;
+                justify-content: center;
+                width: 1.25rem;
+            }
+
+            .role-sidebar-navbar .sidebar-nav-label {
+                animation: none !important;
+                transition: none !important;
+                white-space: nowrap;
+            }
+
+            .role-sidebar-navbar .sidebar-toggle-btn {
+                align-items: center;
+                background: #fff;
+                border: 1px solid rgba(148, 163, 184, .24);
+                border-radius: .65rem;
+                color: #64748b;
+                cursor: pointer;
+                display: inline-flex;
+                height: 2.5rem;
+                justify-content: center;
+                padding: 0;
+                transition: background .18s ease, color .18s ease;
+                width: 2.5rem;
+            }
+
+            .role-sidebar-navbar .sidebar-toggle-btn i {
+                transition: transform .18s ease-out;
+            }
+
+            .role-sidebar-navbar .sidebar-toggle-btn:hover,
+            .role-sidebar-navbar .sidebar-toggle-btn:focus-visible {
+                background: #f1f5f9;
+                color: #334155;
+                outline: 2px solid color-mix(in srgb, var(--bs-primary) 45%, transparent);
+                outline-offset: 2px;
+            }
+
+            .role-sidebar-navbar .navbar-nav.me-auto .nav-link:hover,
+            .role-sidebar-navbar .navbar-nav.me-auto .nav-link:focus-visible {
+                background: color-mix(in srgb, var(--bs-primary) 8%, white);
+                color: var(--bs-primary);
             }
 
             .role-sidebar-navbar .navbar-nav.me-auto .nav-link.active {
@@ -157,23 +224,32 @@
                 width: 100%;
             }
 
+            html.role-sidebar-collapsed .role-sidebar-navbar .navbar-nav.me-auto {
+                align-items: center;
+                padding-inline: .5rem;
+            }
+
+            html.role-sidebar-collapsed .role-sidebar-navbar .navbar-nav.me-auto .nav-link {
+                justify-content: center;
+                padding-inline: .4rem;
+            }
+
+            html.role-sidebar-collapsed .role-sidebar-navbar .sidebar-nav-label {
+                display: none !important;
+            }
+
             #app:has(> .role-sidebar-navbar) > main.app-main {
-                margin-left: 16.5rem;
-                width: calc(100% - 16.5rem);
+                margin-left: var(--role-sidebar-width);
+                min-width: 0;
+                padding-top: calc(3.75rem + 2rem) !important;
+                transition: margin-left .22s ease-out, width .22s ease-out;
+                width: calc(100% - var(--role-sidebar-width));
             }
+        }
 
-            html[data-bs-theme="dark"] .role-sidebar-navbar .navbar-nav.me-auto {
-                background: #1e293b;
-                border-color: #334155;
-            }
-
-            html[data-bs-theme="dark"] .role-sidebar-navbar .navbar-nav.me-auto .nav-link.active {
-                background: color-mix(in srgb, var(--bs-primary) 22%, #1e293b);
-                color: #93c5fd;
-            }
-
-            html[data-bs-theme="dark"] .role-sidebar-navbar .sidebar-account-links {
-                border-color: #334155;
+        @media (max-width: 991.98px) {
+            .role-sidebar-navbar .sidebar-toggle-btn {
+                display: none !important;
             }
         }
 
@@ -404,12 +480,35 @@
         }
     </style>
     @stack('styles')
+    @if(in_array(auth()->user()->role ?? '', ['admin', 'super-admin'], true))
+        <script>
+            if (localStorage.getItem('lemu.role-sidebar-collapsed') === 'true') {
+                document.documentElement.classList.add('role-sidebar-collapsed');
+            }
+        </script>
+    @endif
 </head>
 <body @auth @if(auth()->user()->role === 'student') class="student-theme" @elseif(auth()->user()->role === 'super-admin') class="super-admin-theme" @endif @endauth>
     <div id="app">
         @unless(View::hasSection('hide-navbar') || View::hasSection('hide-nav'))
             <nav class="navbar navbar-expand-xxl navbar-light bg-white shadow-sm sticky-top {{ in_array(auth()->user()->role ?? '', ['admin', 'super-admin'], true) ? 'role-sidebar-navbar' : '' }}">
                 <div class="container-fluid px-3 px-xxl-4">
+                    @auth
+                        @if(in_array(auth()->user()->role, ['admin', 'super-admin'], true))
+                            <button
+                                type="button"
+                                class="sidebar-toggle-btn"
+                                id="roleSidebarToggle"
+                                aria-label="Collapse sidebar"
+                                aria-controls="roleSidebarNavigation"
+                                aria-expanded="true"
+                                title="Collapse sidebar"
+                            >
+                                <i class="bi bi-layout-sidebar-inset" aria-hidden="true"></i>
+                                <span class="visually-hidden">Toggle sidebar labels</span>
+                            </button>
+                        @endif
+                    @endauth
                     <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="{{ url('/dashboard') }}">
                         <img src="{{ asset('storage/images/systemlogo.jpg') }}" alt="" width="36" height="36" class="rounded-circle bg-white object-fit-contain p-1">
                         <span>{{ config('app.name', 'LEMU') }}</span>
@@ -421,7 +520,7 @@
 
                     <div class="collapse navbar-collapse" id="navbarSupportedContent">
                         <!-- Left Navigation Links -->
-                        <ul class="navbar-nav me-auto gap-1">
+                        <ul class="navbar-nav me-auto gap-1" id="roleSidebarNavigation">
                             @auth
                                 @if(auth()->user()->role === 'student')
                                     <li class="nav-item">
@@ -444,65 +543,95 @@
                                     </li>
                                 @elseif(auth()->user()->role === 'admin')
                                     <li class="nav-item">
-                                        <a class="nav-link {{ request()->routeIs('dashboard') ? 'active fw-semibold' : '' }}" href="{{ route('dashboard') }}">Dashboard</a>
+                                        <a class="nav-link {{ request()->routeIs('dashboard') ? 'active fw-semibold' : '' }}" href="{{ route('dashboard') }}" aria-label="Dashboard" data-sidebar-label="Dashboard">
+                                            <i class="bi bi-speedometer2 sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Dashboard</span>
+                                        </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="{{ route('admin.students') }}" class="nav-link {{ request()->routeIs('admin.students*') ? 'active fw-semibold' : '' }}">Manage Students</a>
+                                        <a href="{{ route('admin.students') }}" class="nav-link {{ request()->routeIs('admin.students*') ? 'active fw-semibold' : '' }}" aria-label="Manage Students" data-sidebar-label="Manage Students">
+                                            <i class="bi bi-people sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Manage Students</span>
+                                        </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="{{ route('admin.modules.index') }}" class="nav-link {{ request()->routeIs('admin.modules*') ? 'active fw-semibold' : '' }}">Modules</a>
+                                        <a href="{{ route('admin.modules.index') }}" class="nav-link {{ request()->routeIs('admin.modules*') ? 'active fw-semibold' : '' }}" aria-label="Modules" data-sidebar-label="Modules">
+                                            <i class="bi bi-journal-bookmark sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Modules</span>
+                                        </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="{{ route('admin.question-bank.index') }}" class="nav-link {{ request()->routeIs('admin.question-bank*') ? 'active fw-semibold' : '' }}">Question Bank</a>
+                                        <a href="{{ route('admin.question-bank.index') }}" class="nav-link {{ request()->routeIs('admin.question-bank*') ? 'active fw-semibold' : '' }}" aria-label="Question Bank" data-sidebar-label="Question Bank">
+                                            <i class="bi bi-collection sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Question Bank</span>
+                                        </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="{{ route('admin.tests.index') }}" class="nav-link {{ request()->routeIs('admin.tests*') ? 'active fw-semibold' : '' }}">Examinations</a>
+                                        <a href="{{ route('admin.tests.index') }}" class="nav-link {{ request()->routeIs('admin.tests*') ? 'active fw-semibold' : '' }}" aria-label="Examinations" data-sidebar-label="Examinations">
+                                            <i class="bi bi-clipboard-check sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Examinations</span>
+                                        </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="{{ route('admin.item-analysis.index') }}" class="nav-link {{ request()->routeIs('admin.item-analysis*') ? 'active fw-semibold' : '' }}">Analysis</a>
+                                        <a href="{{ route('admin.item-analysis.index') }}" class="nav-link {{ request()->routeIs('admin.item-analysis*') ? 'active fw-semibold' : '' }}" aria-label="Analysis" data-sidebar-label="Analysis">
+                                            <i class="bi bi-bar-chart-line sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Analysis</span>
+                                        </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="{{ route('faculty.results.index') }}" class="nav-link {{ request()->routeIs('faculty.results*') ? 'active fw-semibold' : '' }}">Results</a>
+                                        <a href="{{ route('faculty.results.index') }}" class="nav-link {{ request()->routeIs('faculty.results*') ? 'active fw-semibold' : '' }}" aria-label="Results" data-sidebar-label="Results">
+                                            <i class="bi bi-graph-up-arrow sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Results</span>
+                                        </a>
                                     </li>
                                 @elseif(auth()->user()->role === 'super-admin')
                                     <li class="nav-item">
-                                        <a class="nav-link {{ request()->routeIs('super-admin.dashboard') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.dashboard') }}">Dashboard</a>
+                                        <a class="nav-link {{ request()->routeIs('super-admin.dashboard') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.dashboard') }}" aria-label="Dashboard" data-sidebar-label="Dashboard">
+                                            <i class="bi bi-speedometer2 sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Dashboard</span>
+                                        </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a class="nav-link {{ request()->routeIs('super-admin.departments*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.departments.index') }}">Colleges</a>
+                                        <a class="nav-link {{ request()->routeIs('super-admin.departments*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.departments.index') }}" aria-label="Colleges" data-sidebar-label="Colleges">
+                                            <i class="bi bi-building sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Colleges</span>
+                                        </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a class="nav-link {{ request()->routeIs('super-admin.users*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.users.index') }}">Faculty</a>
+                                        <a class="nav-link {{ request()->routeIs('super-admin.users*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.users.index') }}" aria-label="Faculty" data-sidebar-label="Faculty">
+                                            <i class="bi bi-person-badge sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Faculty</span>
+                                        </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a class="nav-link {{ request()->routeIs('super-admin.monitoring*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.monitoring') }}">Monitoring</a>
+                                        <a class="nav-link {{ request()->routeIs('super-admin.monitoring*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.monitoring') }}" aria-label="Monitoring" data-sidebar-label="Monitoring">
+                                            <i class="bi bi-activity sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Monitoring</span>
+                                        </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a class="nav-link {{ request()->routeIs('super-admin.tests*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.tests.index') }}">Examinations</a>
+                                        <a class="nav-link {{ request()->routeIs('super-admin.tests*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.tests.index') }}" aria-label="Examinations" data-sidebar-label="Examinations">
+                                            <i class="bi bi-clipboard-check sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Examinations</span>
+                                        </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a class="nav-link {{ request()->routeIs('super-admin.item-analysis*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.item-analysis.index') }}">Analysis</a>
+                                        <a class="nav-link {{ request()->routeIs('super-admin.item-analysis*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.item-analysis.index') }}" aria-label="Analysis" data-sidebar-label="Analysis">
+                                            <i class="bi bi-bar-chart-line sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Analysis</span>
+                                        </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a class="nav-link {{ request()->routeIs('super-admin.question-bank*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.question-bank.index') }}">Question Bank</a>
+                                        <a class="nav-link {{ request()->routeIs('super-admin.question-bank*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.question-bank.index') }}" aria-label="Question Bank" data-sidebar-label="Question Bank">
+                                            <i class="bi bi-collection sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Question Bank</span>
+                                        </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a class="nav-link {{ request()->routeIs('super-admin.results*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.results.index') }}">Results</a>
+                                        <a class="nav-link {{ request()->routeIs('super-admin.results*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.results.index') }}" aria-label="Results" data-sidebar-label="Results">
+                                            <i class="bi bi-graph-up-arrow sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Results</span>
+                                        </a>
                                     </li>
                                 @endif
                                 @if(in_array(Auth::user()->role, ['admin', 'super-admin'], true))
                                     <li class="nav-item sidebar-account-links">
                                         @if(Auth::user()->role === 'admin')
-                                            <a class="nav-link d-flex align-items-center gap-2 {{ request()->routeIs('admin.profile') ? 'active fw-semibold' : '' }}" href="{{ route('admin.profile') }}">
-                                                <i class="bi bi-person" aria-hidden="true"></i>Profile
+                                            <a class="nav-link d-flex align-items-center gap-2 {{ request()->routeIs('admin.profile') ? 'active fw-semibold' : '' }}" href="{{ route('admin.profile') }}" aria-label="Profile" data-sidebar-label="Profile">
+                                                <i class="bi bi-person sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Profile</span>
                                             </a>
                                         @else
-                                            <a class="nav-link d-flex align-items-center gap-2 {{ request()->routeIs('super-admin.profile') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.profile') }}">
-                                                <i class="bi bi-person" aria-hidden="true"></i>Profile
+                                            <a class="nav-link d-flex align-items-center gap-2 {{ request()->routeIs('super-admin.profile') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.profile') }}" aria-label="Profile" data-sidebar-label="Profile">
+                                                <i class="bi bi-person sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Profile</span>
                                             </a>
                                         @endif
-                                        <a class="nav-link d-flex align-items-center gap-2" href="#" data-bs-toggle="modal" data-bs-target="#themeSettingsModal">
-                                            <i class="bi bi-sliders" aria-hidden="true"></i>Settings
+                                        <a class="nav-link d-flex align-items-center gap-2" href="#" data-bs-toggle="modal" data-bs-target="#themeSettingsModal" aria-label="Settings" data-sidebar-label="Settings">
+                                            <i class="bi bi-sliders sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Settings</span>
                                         </a>
                                         <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
                                             @csrf
@@ -510,9 +639,11 @@
                                         <a
                                             class="nav-link d-flex align-items-center gap-2 text-danger"
                                             href="{{ route('logout') }}"
+                                            aria-label="Logout"
+                                            data-sidebar-label="Logout"
                                             onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
                                         >
-                                            <i class="bi bi-box-arrow-right" aria-hidden="true"></i>Logout
+                                            <i class="bi bi-box-arrow-right sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Logout</span>
                                         </a>
                                     </li>
                                 @endif
@@ -1261,6 +1392,45 @@
                         if (!searchForm.contains(event.target)) {
                             hideResults();
                         }
+                    });
+                });
+            </script>
+        @endif
+    @endauth
+    @auth
+        @if(in_array(Auth::user()->role, ['admin', 'super-admin'], true))
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const sidebarToggle = document.getElementById('roleSidebarToggle');
+                    const sidebarNavigation = document.getElementById('roleSidebarNavigation');
+                    const sidebarToggleIcon = sidebarToggle?.querySelector('i');
+                    if (!sidebarToggle || !sidebarNavigation || !sidebarToggleIcon) {
+                        return;
+                    }
+
+                    function setSidebarCollapsed(isCollapsed, persist = true) {
+                        document.documentElement.classList.toggle('role-sidebar-collapsed', isCollapsed);
+                        sidebarToggle.setAttribute('aria-expanded', String(!isCollapsed));
+                        sidebarToggle.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
+                        sidebarToggle.title = isCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
+                        sidebarToggleIcon.style.transform = isCollapsed ? 'scaleX(-1)' : '';
+
+                        sidebarNavigation.querySelectorAll('[data-sidebar-label]').forEach(function (link) {
+                            if (isCollapsed) {
+                                link.title = link.dataset.sidebarLabel;
+                            } else {
+                                link.removeAttribute('title');
+                            }
+                        });
+
+                        if (persist) {
+                            localStorage.setItem('lemu.role-sidebar-collapsed', String(isCollapsed));
+                        }
+                    }
+
+                    setSidebarCollapsed(document.documentElement.classList.contains('role-sidebar-collapsed'), false);
+                    sidebarToggle.addEventListener('click', function () {
+                        setSidebarCollapsed(!document.documentElement.classList.contains('role-sidebar-collapsed'));
                     });
                 });
             </script>

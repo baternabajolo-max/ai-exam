@@ -65,7 +65,7 @@
                     <div class="col-lg-6">
                         <div class="eyebrow mb-4">Board exam preparation</div>
                         <h1 class="hero-title mb-4">Study with purpose. Improve with evidence.</h1>
-                        <p class="hero-copy mb-4">LEMU helps students organize reviewers, practice course-aligned quizzes, understand weak topics, and monitor readiness for board examinations.</p>
+                        <p class="hero-copy mb-4">LEMU helps students organize reviewers, practice module-aligned quizzes, understand weak topics, and monitor readiness for board examinations.</p>
                     </div>
                     <div class="col-lg-6 dashboard-preview" aria-label="Student dashboard preview">
                         <div class="preview-window">
@@ -85,7 +85,7 @@
                 <div class="text-center mx-auto mb-5" style="max-width:680px"><div class="eyebrow mb-2 text-danger">Student tools</div><h2 class="fw-bold mb-3">Everything needed to prepare smarter</h2><p class="text-secondary">LEMU turns study materials, quiz performance, and practice history into a clear learning path.</p></div>
                 <div class="row g-4">
                     <div class="col-md-6 col-lg-3"><article class="feature-card"><div class="feature-icon mb-3"><i class="bi bi-journal-bookmark-fill"></i></div><h3 class="h5 fw-bold">Learn from reviewers</h3><p class="text-secondary small mb-0">Study uploaded modules, subtopics, documents, and instructor resources in one place.</p></article></div>
-                    <div class="col-md-6 col-lg-3"><article class="feature-card"><div class="feature-icon mb-3"><i class="bi bi-ui-checks-grid"></i></div><h3 class="h5 fw-bold">Practice with quizzes</h3><p class="text-secondary small mb-0">Answer course-aligned quizzes and general tests drawn from your reviewer material.</p></article></div>
+                    <div class="col-md-6 col-lg-3"><article class="feature-card"><div class="feature-icon mb-3"><i class="bi bi-ui-checks-grid"></i></div><h3 class="h5 fw-bold">Practice with quizzes</h3><p class="text-secondary small mb-0">Answer module-aligned quizzes and general tests drawn from your reviewer material.</p></article></div>
                     <div class="col-md-6 col-lg-3"><article class="feature-card"><div class="feature-icon mb-3"><i class="bi bi-bullseye"></i></div><h3 class="h5 fw-bold">Find weak topics</h3><p class="text-secondary small mb-0">Use test results to locate concepts that need more review before your board exam.</p></article></div>
                     <div class="col-md-6 col-lg-3"><article class="feature-card"><div class="feature-icon mb-3"><i class="bi bi-bar-chart-fill"></i></div><h3 class="h5 fw-bold">Track readiness</h3><p class="text-secondary small mb-0">Follow mastery, recent scores, study activity, and progress from your dashboard.</p></article></div>
                 </div>

@@ -10,7 +10,7 @@
         <div class="auth-brand-copy">
             <span class="auth-kicker">Board exam readiness</span>
             <h1>Continue your learning journey.</h1>
-            <p>Review course materials, take quizzes, and monitor the topics that need your attention.</p>
+            <p>Review module materials, take quizzes, and monitor the topics that need your attention.</p>
             <div class="auth-progress-card"><div class="auth-progress-head"><span>Student readiness</span><strong>78%</strong></div><div class="auth-progress"><span></span></div></div>
         </div>
         <small>&copy; {{ date('Y') }} LEMU</small>

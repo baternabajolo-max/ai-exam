@@ -48,7 +48,7 @@
         transform: translateX(-3px);
     }
 
-    /* Subtopic Card Layout */
+    /* Module Topic Card Layout */
     .subtopic-item-card {
         background: #ffffff;
         border: 1px solid #e2e8f0;
@@ -103,7 +103,7 @@
             <div class="row align-items-center">
                 <div class="col-lg-9">
                     <span class="badge bg-light text-dark rounded-pill px-3 py-1 fw-semibold small mb-2 shadow-sm">
-                        Course Module
+                        Module
                     </span>
                     <h1 class="fw-bold display-6 mb-2 text-white">{{ $module->title }}</h1>
                     <p class="text-light opacity-75 lead mb-0" style="font-size: 1rem; line-height: 1.6; max-width: 760px;">
@@ -114,14 +114,14 @@
         </div>
     </div>
 
-    {{-- Main Subtopics List --}}
+    {{-- Main Topics List --}}
     <div class="container pb-5">
         <div class="row justify-content-center">
             <div class="col-lg-10">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div>
                         <h2 class="h5 fw-bold text-dark mb-0">Topics to Review</h2>
-                        <small class="text-muted">Master each subtopic to prepare for the general diagnostic assessment.</small>
+                        <small class="text-muted">Master each topic to prepare for the general diagnostic assessment.</small>
                     </div>
                     <span class="badge bg-white border text-secondary rounded-pill px-3 py-1 fw-semibold small shadow-sm">
                         {{ $module->subtopics->count() }} {{ \Illuminate\Support\Str::plural('Topic', $module->subtopics->count()) }}

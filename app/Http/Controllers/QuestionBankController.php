@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Course;
+use App\Models\Department;
 use App\Models\Question;
 use App\Models\QuestionBankItem;
 use App\Models\Topic;
 use App\Models\User;
+use App\Notifications\QuestionBankItemDisabledNotification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -44,22 +46,52 @@ class QuestionBankController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function questionBankData(Request $request): array
+    private function questionBankData(Request $request, bool $readOnly = false): array
     {
-        $faculty = $request->user();
-        $validated = $request->validate([
+        $user = $request->user();
+        abort_unless($readOnly ? $user->role === 'super-admin' : $user->role === 'admin', 404);
+        $rules = [
             'course_id' => ['nullable', 'integer', 'exists:courses,id'],
             'topic_id' => ['nullable', 'integer', 'exists:topics,id'],
             'difficulty' => ['nullable', Rule::in(['easy', 'medium', 'hard'])],
-        ]);
-        $courses = Course::query()
-            ->where('department_id', $faculty->department_id)
-            ->orderBy('name')
-            ->get(['id', 'name']);
+        ];
+        if ($readOnly) {
+            $rules['department_id'] = ['nullable', 'integer', 'exists:departments,id'];
+        }
+        $validated = $request->validate($rules);
+
+        if ($readOnly) {
+            $departments = Department::query()->orderBy('name')->get(['id', 'name']);
+            $selectedDepartmentId = isset($validated['department_id'])
+                ? (int) $validated['department_id']
+                : null;
+            abort_if(isset($validated['course_id']) && $selectedDepartmentId === null, 404);
+            $filterCourses = Course::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'department_id']);
+            $courses = $selectedDepartmentId === null
+                ? collect()
+                : $filterCourses->where('department_id', $selectedDepartmentId)->values();
+        } else {
+            abort_unless($user->role === 'admin', 404);
+            $departments = collect();
+            $filterCourses = collect();
+            $selectedDepartmentId = null;
+            $courses = $user->department_id === null
+                ? collect()
+                : Course::query()
+                    ->where('department_id', $user->department_id)
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'department_id']);
+        }
+
         $selectedCourseId = isset($validated['course_id'])
             ? (int) $validated['course_id']
-            : (! $request->query->has('course_id') && $courses->count() === 1 ? $courses->first()->id : null);
+            : (! $readOnly && ! $request->query->has('course_id') && $courses->count() === 1
+                ? $courses->first()->id
+                : null);
         abort_if($selectedCourseId !== null && ! $courses->contains('id', $selectedCourseId), 404);
+        abort_if($readOnly && $selectedCourseId !== null && $selectedDepartmentId === null, 404);
         $selectedTopicId = isset($validated['topic_id']) ? (int) $validated['topic_id'] : null;
         $selectedDifficulty = $validated['difficulty'] ?? null;
         abort_if($selectedTopicId !== null && $selectedCourseId === null, 404);
@@ -67,20 +99,25 @@ class QuestionBankController extends Controller
         $topics = $selectedCourseId === null
             ? collect()
             : Topic::query()
-                ->where('course_id', $selectedCourseId ?? 0)
+                ->where('course_id', $selectedCourseId)
                 ->where('is_folder', true)
-                ->withCount([
-                    'bankItems as questions_count' => fn ($query) => $query->where('author_id', $faculty->id),
-                ])
+                ->with('createdBy:id,name')
+                ->withCount('bankItems as questions_count')
                 ->orderBy('name')
                 ->get();
         $selectedTopic = $selectedTopicId === null
             ? null
             : $topics->firstWhere('id', $selectedTopicId);
         abort_if($selectedTopicId !== null && $selectedTopic === null, 404);
+        $topicHasOtherFacultyQuestions = ! $readOnly && $selectedTopic !== null
+            && $selectedTopic->bankItems()
+                ->where(function (Builder $query) use ($user): void {
+                    $query->whereNull('author_id')
+                        ->orWhere('author_id', '!=', $user->id);
+                })
+                ->exists();
 
         $itemsQuery = QuestionBankItem::query()
-            ->where('author_id', $faculty->id)
             ->where('course_id', $selectedCourseId)
             ->with([
                 'author:id,name',
@@ -104,13 +141,17 @@ class QuestionBankController extends Controller
 
         return [
             'items' => $items,
+            'departments' => $departments,
+            'filterCourses' => $filterCourses,
             'courses' => $courses,
             'course' => $courses->firstWhere('id', $selectedCourseId),
+            'selectedDepartmentId' => $selectedDepartmentId,
             'selectedCourseId' => $selectedCourseId,
             'topics' => $topics,
             'selectedTopic' => $selectedTopic,
+            'topicHasOtherFacultyQuestions' => $topicHasOtherFacultyQuestions,
             'selectedDifficulty' => $selectedDifficulty,
-            'readOnly' => false,
+            'readOnly' => $readOnly,
         ];
     }
 
@@ -158,8 +199,7 @@ class QuestionBankController extends Controller
 
     public function updateTopic(Request $request, Topic $topic): RedirectResponse
     {
-        $this->ensureFacultyCanUseCourse($request->user(), $topic->course_id);
-        abort_unless($topic->is_folder, 404);
+        $this->ensureFacultyOwnsTopic($request->user(), $topic);
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
         ]);
@@ -196,17 +236,29 @@ class QuestionBankController extends Controller
 
     public function destroyTopic(Request $request, Topic $topic): RedirectResponse
     {
-        $this->ensureFacultyCanUseCourse($request->user(), $topic->course_id);
-        abort_unless($topic->is_folder, 404);
+        $faculty = $request->user();
+        $this->ensureFacultyOwnsTopic($faculty, $topic);
         $courseId = $topic->course_id;
-        $imagePaths = DB::transaction(function () use ($topic): array {
-            Topic::query()->whereKey($topic->id)->lockForUpdate()->firstOrFail();
-            $bankItems = $topic->bankItems()
+        $imagePaths = DB::transaction(function () use ($topic, $faculty): array {
+            $lockedTopic = Topic::query()->whereKey($topic->id)->lockForUpdate()->firstOrFail();
+            $bankItems = $lockedTopic->bankItems()
                 ->lockForUpdate()
                 ->get(['id', 'image_path']);
 
-            $topic->bankItems()->delete();
-            $topic->delete();
+            $hasQuestionsByOtherFaculty = $lockedTopic->bankItems()
+                ->where(function (Builder $query) use ($faculty): void {
+                    $query->whereNull('author_id')
+                        ->orWhere('author_id', '!=', $faculty->id);
+                })
+                ->exists();
+            if ($hasQuestionsByOtherFaculty) {
+                throw ValidationException::withMessages([
+                    'topic' => 'This shared folder contains questions from other faculty and cannot be deleted.',
+                ]);
+            }
+
+            $lockedTopic->bankItems()->delete();
+            $lockedTopic->delete();
 
             return $bankItems->pluck('image_path')->filter()->unique()->values()->all();
         });
@@ -221,65 +273,42 @@ class QuestionBankController extends Controller
 
     public function updateStatus(Request $request, QuestionBankItem $questionBankItem): RedirectResponse
     {
-        $this->ensureFacultyOwnsQuestion($request->user(), $questionBankItem);
+        $user = $request->user();
+        if ($user->role === 'admin') {
+            $this->ensureFacultyOwnsQuestion($user, $questionBankItem);
+        } else {
+            abort_unless($user->role === 'super-admin', 404);
+        }
         abort_if($questionBankItem->topic_id === null, 404);
         $validated = $request->validate([
             'is_active' => ['required', 'boolean'],
         ]);
 
-        $questionBankItem->update(['is_active' => (bool) $validated['is_active']]);
+        $wasActive = $questionBankItem->is_active;
+        $isActive = (bool) $validated['is_active'];
+        $questionBankItem->update(['is_active' => $isActive]);
 
-        return redirect()->route('admin.question-bank.topics.show', $questionBankItem->topic_id)
-            ->with('success', $questionBankItem->is_active ? 'Question enabled for future exams.' : 'Question disabled for future exams.');
+        if ($user->role === 'super-admin' && $wasActive && ! $isActive && $questionBankItem->author !== null) {
+            $questionBankItem->author->notify(new QuestionBankItemDisabledNotification($questionBankItem, $user));
+        }
+
+        $redirect = $user->role === 'super-admin'
+            ? redirect()->route('super-admin.question-bank.index', [
+                'department_id' => $questionBankItem->course()->value('department_id'),
+                'course_id' => $questionBankItem->course_id,
+                'topic_id' => $questionBankItem->topic_id,
+            ])
+            : redirect()->route('admin.question-bank.topics.show', $questionBankItem->topic_id);
+
+        return $redirect->with('success', $isActive ? 'Question enabled for future exams.' : 'Question disabled for future exams.');
     }
 
     public function adminIndex(Request $request): View
     {
-        $validated = $request->validate([
-            'course_id' => ['nullable', 'integer', 'exists:courses,id'],
-            'author_id' => ['nullable', 'integer', 'exists:users,id'],
-        ]);
-        $selectedFaculty = null;
-        if (isset($validated['author_id'])) {
-            $selectedFaculty = User::query()
-                ->with('department:id,name')
-                ->where('role', 'admin')
-                ->findOrFail($validated['author_id']);
-        } elseif (isset($validated['course_id'])) {
-            abort(404);
-        }
+        $data = $this->questionBankData($request, true);
 
-        $courses = $selectedFaculty?->department_id === null
-            ? collect()
-            : Course::query()
-                ->where('department_id', $selectedFaculty->department_id)
-                ->with('department:id,name')
-                ->orderBy('name')
-                ->get();
-        $faculties = User::query()
-            ->where('role', 'admin')
-            ->orderBy('name')
-            ->get(['id', 'name', 'email', 'department_id']);
-        abort_if(isset($validated['course_id']) && ! $courses->contains('id', (int) $validated['course_id']), 404);
-        $items = QuestionBankItem::query()
-            ->with(['course:id,name,department_id', 'course.department:id,name', 'author:id,name', 'subtopic:id,title'])
-            ->when(
-                isset($validated['course_id']),
-                fn ($query) => $query->where('course_id', $validated['course_id']),
-            )
-            ->when(isset($validated['author_id']), fn ($query) => $query->where('author_id', $validated['author_id']))
-            ->latest()
-            ->paginate(25)
-            ->withQueryString();
-
-        return view('super-admin.question-bank.index', [
-            'items' => $items,
-            'courses' => $courses,
-            'faculties' => $faculties,
-            'selectedFaculty' => $selectedFaculty,
-            'selectedCourseId' => $validated['course_id'] ?? null,
-            'selectedAuthorId' => $validated['author_id'] ?? null,
-            'readOnly' => true,
+        return view('admin.question-bank.index', $data + [
+            'showTopicPage' => $data['selectedTopic'] !== null,
         ]);
     }
 
@@ -397,6 +426,7 @@ class QuestionBankController extends Controller
     {
         abort_unless(
             $faculty->role === 'admin'
+                && $faculty->department_id !== null
                 && Course::query()
                     ->whereKey($courseId)
                     ->where('department_id', $faculty->department_id)
@@ -431,9 +461,16 @@ class QuestionBankController extends Controller
     {
         abort_unless(
             $faculty->role === 'admin'
+                && $faculty->department_id !== null
                 && $questionBankItem->author_id === $faculty->id
                 && $questionBankItem->course()->where('department_id', $faculty->department_id)->exists(),
             404,
         );
+    }
+
+    private function ensureFacultyOwnsTopic(User $faculty, Topic $topic): void
+    {
+        $this->ensureFacultyCanUseCourse($faculty, $topic->course_id);
+        abort_unless($topic->is_folder && $topic->created_by === $faculty->id, 404);
     }
 }

@@ -342,6 +342,233 @@ class StudentActivityControllerTest extends TestCase
         ]))->assertNotFound();
     }
 
+    public function test_module_activity_returns_only_quiz_verified_time_and_all_time_topic_totals(): void
+    {
+        $this->travelTo('2026-10-25 12:00:00');
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
+        $otherCourse = Course::create(['name' => 'Information Systems', 'code' => 'IS', 'department_id' => $department->id]);
+        $admin = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $student = User::factory()->create([
+            'role' => 'student',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+            'created_at' => '2026-08-16 10:00:00',
+        ]);
+        $otherStudent = User::factory()->create([
+            'role' => 'student',
+            'department_id' => $department->id,
+            'course_id' => $otherCourse->id,
+        ]);
+        $module = Module::create(['title' => 'Database Systems', 'department_id' => $department->id, 'course_id' => $course->id]);
+        $verifiedTopic = Subtopic::create(['module_id' => $module->id, 'title' => 'Verified Topic']);
+        $unverifiedTopic = Subtopic::create(['module_id' => $module->id, 'title' => 'Unverified Topic']);
+        $otherVerifiedTopic = Subtopic::create(['module_id' => $module->id, 'title' => 'Another Verified Topic']);
+        $quiz = StudentTest::create([
+            'title' => 'Verified Topic Quiz',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+            'subtopic_id' => $verifiedTopic->id,
+            'is_general' => false,
+        ]);
+        Result::create([
+            'user_id' => $student->id,
+            'test_id' => $quiz->id,
+            'score' => 8,
+            'total_questions' => 10,
+        ]);
+        $otherQuiz = StudentTest::create([
+            'title' => 'Another Verified Topic Quiz',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+            'subtopic_id' => $otherVerifiedTopic->id,
+            'is_general' => false,
+        ]);
+        Result::create([
+            'user_id' => $student->id,
+            'test_id' => $otherQuiz->id,
+            'score' => 7,
+            'total_questions' => 10,
+        ]);
+
+        foreach ([
+            [$verifiedTopic, '2026-09-10', 600],
+            [$verifiedTopic, '2026-10-25', 1200],
+            [$verifiedTopic, '2026-10-20', 900],
+            [$unverifiedTopic, '2026-10-25', 900],
+            [$otherVerifiedTopic, '2026-10-20', 700],
+        ] as [$topic, $date, $seconds]) {
+            StudySession::create([
+                'user_id' => $student->id,
+                'module_id' => $module->id,
+                'subtopic_id' => $topic->id,
+                'activity_date' => $date,
+                'active_seconds' => $seconds,
+                'started_at' => "{$date} 09:00:00",
+                'last_heartbeat_at' => "{$date} 09:30:00",
+            ]);
+        }
+
+        $this->actingAs($admin)
+            ->getJson(route('admin.modules.students.activity', [
+                'module' => $module,
+                'student' => $student,
+                'month' => '2026-10',
+            ]))
+            ->assertOk()
+            ->assertJsonPath('months.1.active_seconds', 600)
+            ->assertJsonPath('months.2.active_seconds', 1900)
+            ->assertJsonPath('calendar.days.24.active_seconds', 300)
+            ->assertJsonPath('topics.0.title', 'Another Verified Topic')
+            ->assertJsonPath('topics.0.active_seconds', 700)
+            ->assertJsonPath('topics.1.title', 'Unverified Topic')
+            ->assertJsonPath('topics.1.active_seconds', 0)
+            ->assertJsonPath('topics.2.title', 'Verified Topic')
+            ->assertJsonPath('topics.2.active_seconds', 1200)
+            ->assertJsonPath('topics.2.all_time_seconds', 1800);
+
+        $this->getJson(route('admin.modules.students.activity', [
+            'module' => $module,
+            'student' => $student,
+            'month' => '2026-10',
+            'date' => '2026-10-25',
+        ]))
+            ->assertOk()
+            ->assertJsonPath('date', '2026-10-25')
+            ->assertJsonPath('topics.0.active_seconds', 0)
+            ->assertJsonPath('topics.2.active_seconds', 300);
+
+        $this->getJson(route('admin.modules.students.activity', [
+            'module' => $module,
+            'student' => $student,
+            'month' => '2026-10',
+            'subtopic_id' => $verifiedTopic->id,
+        ]))
+            ->assertOk()
+            ->assertJsonPath('subtopic_id', $verifiedTopic->id)
+            ->assertJsonPath('months.1.active_seconds', 600)
+            ->assertJsonPath('months.2.active_seconds', 1200)
+            ->assertJsonPath('calendar.days.24.active_seconds', 300);
+
+        $this->getJson(route('admin.modules.students.activity', [
+            'module' => $module,
+            'student' => $student,
+            'month' => '2026-10',
+            'date' => '2026-09-10',
+        ]))->assertNotFound();
+
+        $this->getJson(route('admin.modules.students.activity', [
+            'module' => $module,
+            'student' => $otherStudent,
+        ]))->assertNotFound();
+    }
+
+    public function test_admin_module_overview_returns_completion_metrics_and_selected_topic_attempt_history(): void
+    {
+        $this->travelTo('2026-11-19 12:00:00');
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $otherDepartment = Department::create(['name' => 'Education', 'code' => 'EDU']);
+        $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
+        $otherCourse = Course::create(['name' => 'Teaching', 'code' => 'TEACH', 'department_id' => $otherDepartment->id]);
+        $admin = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $student = User::factory()->create([
+            'role' => 'student',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $foreignStudent = User::factory()->create([
+            'role' => 'student',
+            'department_id' => $otherDepartment->id,
+            'course_id' => $otherCourse->id,
+        ]);
+        $module = Module::create(['title' => 'Database Systems', 'department_id' => $department->id, 'course_id' => $course->id]);
+        $completedTopic = Subtopic::create(['module_id' => $module->id, 'title' => 'Completed Topic']);
+        $inProgressTopic = Subtopic::create(['module_id' => $module->id, 'title' => 'In Progress Topic']);
+        $notStartedTopic = Subtopic::create(['module_id' => $module->id, 'title' => 'Not Started Topic']);
+        $foreignModule = Module::create(['title' => 'Foreign Course', 'department_id' => $department->id, 'course_id' => $course->id]);
+        $foreignTopic = Subtopic::create(['module_id' => $foreignModule->id, 'title' => 'Foreign Topic']);
+
+        foreach ([
+            [$completedTopic, 300],
+            [$inProgressTopic, 240],
+        ] as [$topic, $seconds]) {
+            StudySession::create([
+                'user_id' => $student->id,
+                'module_id' => $module->id,
+                'subtopic_id' => $topic->id,
+                'activity_date' => '2026-11-19',
+                'active_seconds' => $seconds,
+                'started_at' => '2026-11-19 09:00:00',
+                'last_heartbeat_at' => '2026-11-19 09:30:00',
+            ]);
+        }
+
+        foreach ([
+            [$completedTopic, 8],
+            [$completedTopic, 10],
+            [$inProgressTopic, 7],
+        ] as [$topic, $score]) {
+            $quiz = StudentTest::create([
+                'title' => "{$topic->title} Quiz",
+                'department_id' => $department->id,
+                'course_id' => $course->id,
+                'subtopic_id' => $topic->id,
+                'is_general' => false,
+            ]);
+            Result::create([
+                'user_id' => $student->id,
+                'test_id' => $quiz->id,
+                'score' => $score,
+                'total_questions' => 10,
+            ]);
+        }
+
+        $overviewUrl = route('admin.modules.students.overview', [
+            'module' => $module,
+            'student' => $student,
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson($overviewUrl)
+            ->assertOk()
+            ->assertJsonPath('verified_seconds', 540)
+            ->assertJsonPath('topics_completed', 1)
+            ->assertJsonPath('topic_count', 3)
+            ->assertJsonPath('average_score', 83.33)
+            ->assertJsonPath('quiz_attempts', 3)
+            ->assertJsonPath('status', 'Needs Review')
+            ->assertJsonPath('topics.0.status', 'Completed')
+            ->assertJsonPath('topics.1.status', 'In Progress')
+            ->assertJsonPath('topics.2.status', 'Not Started');
+
+        $this->getJson($overviewUrl.'?subtopic_id='.$completedTopic->id)
+            ->assertOk()
+            ->assertJsonPath('selected_topic.title', 'Completed Topic')
+            ->assertJsonPath('selected_topic.status', 'Completed')
+            ->assertJsonPath('selected_topic.best_score', 100)
+            ->assertJsonPath('attempts.0.points', 40)
+            ->assertJsonPath('attempts.1.points', 50);
+
+        $this->getJson($overviewUrl.'?subtopic_id='.$notStartedTopic->id)
+            ->assertOk()
+            ->assertJsonPath('selected_topic.status', 'Not Started')
+            ->assertJsonPath('attempts', []);
+
+        $this->getJson($overviewUrl.'?subtopic_id='.$foreignTopic->id)->assertNotFound();
+        $this->getJson($overviewUrl.'?subtopic_id=not-a-number')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('subtopic_id');
+
+        $this->getJson(route('admin.modules.students.overview', [
+            'module' => $module,
+            'student' => $foreignStudent,
+        ]))->assertNotFound();
+
+        $this->actingAs($student)
+            ->getJson($overviewUrl)
+            ->assertRedirect(route('student.dashboard'));
+    }
+
     public function test_admin_result_view_rejects_results_outside_the_selected_student_and_department(): void
     {
         $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
@@ -400,7 +627,7 @@ class StudentActivityControllerTest extends TestCase
         $sessionId = $startResponse->json('session_id');
 
         $this->travel(30)->seconds();
-        $this->postJson(route('student.activity.sessions.heartbeat', ['studySession' => $sessionId]))
+        $this->postJson(route('student.study-heartbeat'), ['session_id' => $sessionId])
             ->assertOk()
             ->assertJsonPath('active_seconds', 30);
 
@@ -432,20 +659,78 @@ class StudentActivityControllerTest extends TestCase
         $sessionId = $startResponse->json('session_id');
 
         $this->travel(90)->seconds();
-        $this->postJson(route('student.activity.sessions.heartbeat', ['studySession' => $sessionId]))
+        $this->postJson(route('student.study-heartbeat'), ['session_id' => $sessionId])
             ->assertOk()
-            ->assertJsonPath('active_seconds', 45);
+            ->assertJsonPath('active_seconds', 30);
 
         $this->travel(180)->seconds();
-        $this->postJson(route('student.activity.sessions.heartbeat', ['studySession' => $sessionId]))
+        $this->postJson(route('student.study-heartbeat'), ['session_id' => $sessionId])
             ->assertStatus(409);
 
         $this->assertDatabaseHas('study_sessions', [
             'id' => $sessionId,
-            'active_seconds' => 45,
+            'active_seconds' => 30,
             'pause_reason' => 'midnight',
             'ended_at' => '2026-10-26 00:00:30',
         ]);
+    }
+
+    public function test_heartbeats_require_twenty_five_seconds_and_enforce_the_cumulative_topic_cap(): void
+    {
+        $this->travelTo('2026-10-25 10:00:00');
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $student = User::factory()->create(['role' => 'student', 'department_id' => $department->id]);
+        $module = Module::create(['title' => 'Web Technologies', 'department_id' => $department->id]);
+        $subtopic = Subtopic::create(['module_id' => $module->id, 'title' => 'REST APIs']);
+        $cappedSubtopic = Subtopic::create(['module_id' => $module->id, 'title' => 'HTTP Caching']);
+
+        $sessionId = $this->actingAs($student)
+            ->postJson(route('student.activity.sessions.store'), ['subtopic_id' => $subtopic->id])
+            ->assertCreated()
+            ->json('session_id');
+
+        $this->travel(24)->seconds();
+        $this->postJson(route('student.study-heartbeat'), ['session_id' => $sessionId])
+            ->assertOk()
+            ->assertJsonPath('active_seconds', 0);
+
+        $this->travel(1)->seconds();
+        $this->postJson(route('student.study-heartbeat'), ['session_id' => $sessionId])
+            ->assertOk()
+            ->assertJsonPath('active_seconds', 25);
+
+        StudySession::create([
+            'user_id' => $student->id,
+            'module_id' => $module->id,
+            'subtopic_id' => $cappedSubtopic->id,
+            'activity_date' => '2026-10-25',
+            'active_seconds' => 1790,
+            'started_at' => '2026-10-25 08:00:00',
+            'last_heartbeat_at' => '2026-10-25 08:30:00',
+            'ended_at' => '2026-10-25 08:30:00',
+        ]);
+        $cappedSessionId = $this->postJson(route('student.activity.sessions.store'), ['subtopic_id' => $cappedSubtopic->id])
+            ->assertCreated()
+            ->assertJsonPath('remaining_seconds', 10)
+            ->json('session_id');
+
+        $this->travel(25)->seconds();
+        $this->postJson(route('student.study-heartbeat'), ['session_id' => $cappedSessionId])
+            ->assertStatus(409)
+            ->assertJsonPath('active_seconds', 1800)
+            ->assertJsonPath('capped', true);
+
+        $this->assertDatabaseHas('study_sessions', [
+            'id' => $cappedSessionId,
+            'active_seconds' => 10,
+            'pause_reason' => 'topic_cap',
+        ]);
+
+        $this->postJson(route('student.activity.sessions.store'), ['subtopic_id' => $cappedSubtopic->id])
+            ->assertOk()
+            ->assertJsonPath('session_id', null)
+            ->assertJsonPath('capped', true)
+            ->assertJsonPath('active_seconds', 1800);
     }
 
     public function test_student_cannot_track_another_departments_subtopic_or_another_students_session(): void
@@ -474,6 +759,9 @@ class StudentActivityControllerTest extends TestCase
             ->assertNotFound();
 
         $this->postJson(route('student.activity.sessions.stop', ['studySession' => $otherSession->id]), ['reason' => 'quiz'])
+            ->assertNotFound();
+
+        $this->postJson(route('student.study-heartbeat'), ['session_id' => $otherSession->id])
             ->assertNotFound();
 
         $this->assertDatabaseHas('study_sessions', [
@@ -513,7 +801,11 @@ class StudentActivityControllerTest extends TestCase
         $this->get(route('student.learn.review', $subtopic))
             ->assertSee('data-subtopic-id="'.$subtopic->id.'"', false)
             ->assertSee('data-start-url="'.route('student.activity.sessions.store').'"', false)
-            ->assertSee('Reading time is tracked while this page is visible; quizzes pause the timer.');
+            ->assertSee('data-heartbeat-url="'.route('student.study-heartbeat').'"', false)
+            ->assertSee('Study Timer Paused')
+            ->assertSee('No reading progress or page scrolling was detected.')
+            ->assertSee('30-Minute Topic Study Limit Reached')
+            ->assertSee('performance.now() - lastProgressAt >= 45000', false);
     }
 
     public function test_activity_session_endpoints_validate_input_without_changing_session_state(): void

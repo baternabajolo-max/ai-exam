@@ -197,7 +197,7 @@
                             data-bs-toggle="dropdown"
                             aria-expanded="false">
                         <i class="bi bi-journal-bookmark"></i>
-                        <span>{{ $selectedCourseId ? $courses->firstWhere('id', $selectedCourseId)?->name : 'Choose Course' }}</span>
+                        <span>{{ $selectedCourseId ? $courses->firstWhere('id', $selectedCourseId)?->name : 'Choose Program' }}</span>
                         <i class="bi bi-chevron-down small"></i>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="chooseCourseDropdown">
@@ -253,7 +253,7 @@
 
                 <div class="d-flex align-items-center justify-content-between gap-2 px-4 pb-4">
                     <span class="badge rounded-pill {{ $module->course_id ? 'text-bg-primary' : 'text-bg-secondary' }}">
-                        {{ $module->course?->name ?? 'Course not assigned' }}
+                        {{ $module->course?->name ?? 'Program not assigned' }}
                     </span>
                 </div>
             </div>
@@ -266,7 +266,7 @@
                             <i class="bi bi-folder2-open"></i>
                         </div>
                         <h5 class="fw-bold text-slate-900 mb-1">No Modules Found</h5>
-                        <p class="text-secondary small mb-0">Click "Add New Module" to create a learning track for a program in your college.</p>
+                        <p class="text-secondary small mb-0">Click "Add New Module" to create a learning module for a program in your college.</p>
                     </div>
                 </div>
             </div>
@@ -288,7 +288,7 @@
                     </div>
                     <h5 class="fw-bold text-slate-900 mb-2">Are you sure?</h5>
                     <p class="text-secondary small mb-0 px-2">
-                        This will permanently delete the <strong>{{ $module->title }}</strong> module and all of its associated subtopic files. This action cannot be undone.
+                        This will permanently delete the <strong>{{ $module->title }}</strong> module and all of its associated topic files. This action cannot be undone.
                     </p>
                 </div>
                 <div class="modal-footer bg-light border-top-0 px-4 pb-4 justify-content-center gap-2">
@@ -311,7 +311,7 @@
                 <div class="modal-header border-bottom-0 px-4 pt-4 text-white" style="background: var(--lemu-burgundy);">
                     <div>
                         <h5 class="modal-title fw-bold text-white" id="createModuleModalLabel">Add New Module</h5>
-                        <small class="text-warning-subtle">Create a brand new curriculum track.</small>
+                        <small class="text-warning-subtle">Create a brand new module for an academic program.</small>
                     </div>
                     <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -320,7 +320,7 @@
                         @csrf
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold small text-slate-700">Module Title</label>
+                            <label class="form-label fw-bold small text-slate-700">Module Name</label>
                             <input type="text" name="title" class="form-control bg-light border-0 py-2.5 rounded-3" value="{{ old('title') }}" placeholder="e.g., Network Security" required>
                         </div>
 

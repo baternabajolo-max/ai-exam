@@ -9,8 +9,10 @@ use App\Models\QuestionBankItem;
 use App\Models\Test as Exam;
 use App\Models\Topic;
 use App\Models\User;
+use App\Notifications\QuestionBankItemDisabledNotification;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -682,146 +684,187 @@ class QuestionBankControllerTest extends TestCase
         ]);
     }
 
-    public function test_admin_can_inspect_questions_without_editing_them(): void
+    public function test_faculty_share_program_folders_and_questions_but_only_the_folder_creator_can_manage_them(): void
     {
         $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
         $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
-        $faculty = User::factory()->create([
-            'role' => 'admin',
-            'department_id' => $department->id,
+        $folderCreator = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $faculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $topic = $this->createTopic($course, $folderCreator, 'Network security');
+        $creatorItem = QuestionBankItem::create([
             'course_id' => $course->id,
-        ]);
-        $admin = User::factory()->create(['role' => 'super-admin']);
-        $item = QuestionBankItem::create([
-            'course_id' => $course->id,
-            'author_id' => $faculty->id,
-            'question' => 'What does TLS protect?',
-            'options' => ['Confidentiality', 'Email routing', 'File compression', 'Power supply'],
-            'correct_answer' => 'Confidentiality',
-            'topic' => 'Network security',
-        ]);
-
-        $this->actingAs($admin)
-            ->get(route('super-admin.question-bank.index'))
-            ->assertOk()
-            ->assertSee($item->question)
-            ->assertSee('data-bs-target="#viewQuestionModal'.$item->id.'"', false)
-            ->assertSee('id="viewQuestionModal'.$item->id.'"', false)
-            ->assertSee('aria-label="View question and answer choices"', false)
-            ->assertSee('Confidentiality')
-            ->assertSee('Email routing')
-            ->assertSee('Correct answer')
-            ->assertDontSee('Network security')
-            ->assertSee('Select a Faculty member to see their questions across all programs')
-            ->assertSee('data-bs-target="#filterQuestionBankModal"', false)
-            ->assertSee('id="filterQuestionBankModal"', false)
-            ->assertSee('name="author_id"', false)
-            ->assertSee('Apply filters')
-            ->assertSee('data-clear-question-bank-filters', false)
-            ->assertSee('Results update only after you apply the filters.')
-            ->assertDontSee('facultySelect.form.requestSubmit()', false)
-            ->assertDontSee('programSelect.form.requestSubmit()', false)
-            ->assertDontSee('name="department_id"', false)
-            ->assertDontSee('id="question-bank-course"', false)
-            ->assertDontSee('id="question-bank-department"', false)
-            ->assertDontSee(route('admin.question-bank.update', $item));
-
-        $this->actingAs(User::factory()->create(['role' => 'student']))
-            ->get(route('admin.question-bank.index'))
-            ->assertRedirect(route('student.dashboard'));
-    }
-
-    public function test_admin_can_filter_the_question_bank_to_one_faculty_member(): void
-    {
-        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
-        $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
-        $firstFaculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
-        $secondFaculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
-        $firstItem = QuestionBankItem::create([
-            'course_id' => $course->id,
-            'author_id' => $firstFaculty->id,
-            'question' => 'First Faculty question?',
+            'topic_id' => $topic->id,
+            'author_id' => $folderCreator->id,
+            'question' => 'Question from the folder creator?',
             'options' => ['A', 'B', 'C', 'D'],
             'correct_answer' => 'A',
         ]);
-        QuestionBankItem::create([
+        $facultyItem = QuestionBankItem::create([
             'course_id' => $course->id,
-            'author_id' => $secondFaculty->id,
-            'question' => 'Second Faculty question?',
+            'topic_id' => $topic->id,
+            'author_id' => $faculty->id,
+            'question' => 'Question from another faculty member?',
             'options' => ['A', 'B', 'C', 'D'],
             'correct_answer' => 'B',
         ]);
 
-        $this->actingAs(User::factory()->create(['role' => 'super-admin']))
-            ->get(route('super-admin.question-bank.index', ['author_id' => $firstFaculty->id]))
-            ->assertSee($firstItem->question)
-            ->assertDontSee('Second Faculty question?')
-            ->assertSee($firstFaculty->name);
+        $this->actingAs($faculty)
+            ->get(route('admin.question-bank.topics.show', $topic))
+            ->assertOk()
+            ->assertSee($topic->name)
+            ->assertSee($creatorItem->question)
+            ->assertSee($facultyItem->question)
+            ->assertSee($folderCreator->name)
+            ->assertDontSee(route('admin.question-bank.update', $creatorItem))
+            ->assertDontSee(route('admin.question-bank.destroy', $creatorItem))
+            ->assertSee(route('admin.question-bank.update', $facultyItem))
+            ->assertSee(route('admin.question-bank.destroy', $facultyItem));
+
+        $this->from(route('admin.question-bank.topics.show', $topic))
+            ->actingAs($folderCreator)
+            ->delete(route('admin.question-bank.topics.destroy', $topic))
+            ->assertSessionHasErrors('topic');
+
+        $this->assertDatabaseHas('topics', ['id' => $topic->id]);
+        $this->assertDatabaseHas('question_bank_items', ['id' => $creatorItem->id]);
+        $this->assertDatabaseHas('question_bank_items', ['id' => $facultyItem->id]);
+
+        $this->actingAs($faculty)
+            ->delete(route('admin.question-bank.topics.destroy', $topic))
+            ->assertNotFound();
     }
 
-    public function test_selecting_a_faculty_shows_all_their_program_questions_and_allows_optional_program_filtering(): void
+    public function test_super_admin_can_browse_shared_question_folders_after_selecting_a_college_and_program(): void
     {
         $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
         $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
-        $secondCourse = Course::create(['name' => 'Information Systems', 'code' => 'IS', 'department_id' => $department->id]);
-        $otherDepartment = Department::create(['name' => 'Education', 'code' => 'EDU']);
-        $otherCourse = Course::create(['name' => 'Teaching', 'code' => 'TEACH', 'department_id' => $otherDepartment->id]);
         $faculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
-        $otherFaculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
-        QuestionBankItem::create([
+        $topic = $this->createTopic($course, $faculty, 'Network security');
+        $item = QuestionBankItem::create([
             'course_id' => $course->id,
+            'topic_id' => $topic->id,
             'author_id' => $faculty->id,
-            'question' => 'Question in first program?',
-            'options' => ['A', 'B', 'C', 'D'],
-            'correct_answer' => 'A',
+            'question' => 'What does TLS protect?',
+            'options' => ['Confidentiality', 'Email routing', 'File compression', 'Power supply'],
+            'correct_answer' => 'Confidentiality',
         ]);
-        QuestionBankItem::create([
-            'course_id' => $secondCourse->id,
-            'author_id' => $faculty->id,
-            'question' => 'Question in second program?',
-            'options' => ['A', 'B', 'C', 'D'],
-            'correct_answer' => 'A',
-        ]);
-        QuestionBankItem::create([
-            'course_id' => $course->id,
-            'author_id' => $otherFaculty->id,
-            'question' => 'Another Faculty question?',
-            'options' => ['A', 'B', 'C', 'D'],
-            'correct_answer' => 'A',
-        ]);
+        $admin = User::factory()->create(['role' => 'super-admin']);
 
-        $this->actingAs(User::factory()->create(['role' => 'super-admin']))
-            ->get(route('super-admin.question-bank.index', ['author_id' => $faculty->id]))
-            ->assertViewHas('selectedCourseId', null)
-            ->assertDontSee('name="department_id"', false)
-            ->assertDontSee('id="question-bank-department"', false)
-            ->assertDontSee('id="question-bank-college-name"', false)
-            ->assertSee('College: '.$department->name)
-            ->assertSee('id="question-bank-author"', false)
-            ->assertSee('value="'.$faculty->id.'" selected', false)
-            ->assertSee('name="course_id" class="form-select form-select-lg"', false)
-            ->assertSee('All programs')
-            ->assertSee('Question in first program?')
-            ->assertSee('Question in second program?')
-            ->assertDontSee('Another Faculty question?')
+        $this->actingAs($admin)
+            ->get(route('super-admin.question-bank.index'))
+            ->assertOk()
+            ->assertSee('id="question-bank-department"', false)
+            ->assertSee('id="question-bank-course"', false)
+            ->assertSee('disabled', false)
+            ->assertSee('data-bs-target="#questionBankFilterModal"', false)
+            ->assertSee('data-question-bank-filter-trigger', false)
+            ->assertSee('Select a college first')
+            ->assertSee('Apply Filter')
+            ->assertDontSee($item->question)
+            ->assertDontSee('Create Topic')
+            ->assertDontSee('Create Question');
+
+        $this->get(route('super-admin.question-bank.index', ['department_id' => $department->id]))
+            ->assertOk()
             ->assertSee($course->name)
-            ->assertSee($secondCourse->name)
-            ->assertDontSee($otherCourse->name);
+            ->assertDontSee($item->question);
 
         $this->get(route('super-admin.question-bank.index', [
-            'author_id' => $faculty->id,
+            'department_id' => $department->id,
             'course_id' => $course->id,
         ]))
-            ->assertSee('Question in first program?')
-            ->assertDontSee('Question in second program?');
+            ->assertOk()
+            ->assertSee($topic->name)
+            ->assertDontSee($item->question);
 
         $this->get(route('super-admin.question-bank.index', [
-            'author_id' => $faculty->id,
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+            'topic_id' => $topic->id,
+        ]))
+            ->assertOk()
+            ->assertSee($item->question)
+            ->assertSee($faculty->name)
+            ->assertSee(route('super-admin.question-bank.status', $item))
+            ->assertDontSee(route('admin.question-bank.update', $item))
+            ->assertDontSee(route('admin.question-bank.destroy', $item))
+            ->assertDontSee(route('admin.question-bank.store'))
+            ->assertDontSee('Create Question')
+            ->assertViewHas('readOnly', true);
+
+        $this->post(route('admin.question-bank.store'), [
+            'course_id' => $course->id,
+            'topic_id' => $topic->id,
+            'question' => 'Super Admin cannot create this question?',
+            'options' => ['A', 'B', 'C', 'D'],
+            'correct_choice' => 'A',
+            'difficulty' => 'easy',
+        ])->assertRedirect();
+
+        $this->assertDatabaseMissing('question_bank_items', [
+            'course_id' => $course->id,
+            'question' => 'Super Admin cannot create this question?',
+        ]);
+    }
+
+    public function test_super_admin_must_select_the_matching_college_before_a_program(): void
+    {
+        $firstDepartment = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $firstCourse = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $firstDepartment->id]);
+        $otherDepartment = Department::create(['name' => 'Education', 'code' => 'EDU']);
+        $otherCourse = Course::create(['name' => 'Teaching', 'code' => 'TEACH', 'department_id' => $otherDepartment->id]);
+
+        $this->actingAs(User::factory()->create(['role' => 'super-admin']))
+            ->get(route('super-admin.question-bank.index', ['course_id' => $firstCourse->id]))
+            ->assertNotFound();
+
+        $this->get(route('super-admin.question-bank.index', [
+            'department_id' => $firstDepartment->id,
             'course_id' => $otherCourse->id,
         ]))->assertNotFound();
 
-        $this->get(route('super-admin.question-bank.index', ['course_id' => $course->id]))
-            ->assertNotFound();
+        $this->get(route('super-admin.question-bank.index', [
+            'department_id' => $firstDepartment->id,
+            'course_id' => $firstCourse->id,
+        ]))->assertOk();
+    }
+
+    public function test_super_admin_can_disable_a_shared_question_and_notify_its_author(): void
+    {
+        Notification::fake();
+
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
+        $faculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $topic = $this->createTopic($course, $faculty, 'Network security');
+        $item = QuestionBankItem::create([
+            'course_id' => $course->id,
+            'topic_id' => $topic->id,
+            'author_id' => $faculty->id,
+            'question' => 'What does TLS protect?',
+            'options' => ['Confidentiality', 'Email routing', 'File compression', 'Power supply'],
+            'correct_answer' => 'Confidentiality',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs(User::factory()->create(['role' => 'super-admin']))
+            ->patch(route('super-admin.question-bank.status', $item), ['is_active' => '0'])
+            ->assertRedirect(route('super-admin.question-bank.index', [
+                'department_id' => $department->id,
+                'course_id' => $course->id,
+                'topic_id' => $topic->id,
+            ]));
+
+        $this->assertDatabaseHas('question_bank_items', ['id' => $item->id, 'is_active' => false]);
+        Notification::assertSentTo($faculty, QuestionBankItemDisabledNotification::class, function ($notification, array $channels) use ($item): bool {
+            return $notification->questionBankItem->is($item)
+                && $channels === ['database']
+                && str_contains($notification->toArray($item->author)['message'], $item->question);
+        });
+
+        $this->patch(route('super-admin.question-bank.status', $item), ['is_active' => '0']);
+        $this->patch(route('super-admin.question-bank.status', $item), ['is_active' => '1']);
+        Notification::assertSentTimes(QuestionBankItemDisabledNotification::class, 1);
     }
 
     private function createTopic(Course $course, User $creator, string $name): Topic
