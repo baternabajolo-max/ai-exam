@@ -7,10 +7,8 @@ use App\Models\Module;
 use App\Models\Question;
 use App\Models\Result;
 use App\Models\Test;
-use App\Models\User;
 use App\Services\AchievementUnlockService;
 use App\Services\AiService;
-use App\Services\LeaderboardNotificationService;
 use App\Services\LeaderboardPointsService;
 use App\Services\StudentReadinessService;
 use Carbon\CarbonImmutable;
@@ -329,36 +327,6 @@ class StudentController extends Controller
         $student->update(['badge_icon' => $achievement->icon]);
 
         return back()->with('success', 'Achievement claimed and added to your profile.');
-    }
-
-    public function leaderboard(
-        LeaderboardNotificationService $leaderboardNotificationService,
-        LeaderboardPointsService $leaderboardPointsService,
-    ) {
-        $departmentId = auth()->user()->department_id;
-        $students = $departmentId === null
-            ? collect()
-            : User::where('role', 'student')
-                ->where('department_id', $departmentId)
-                ->get();
-
-        foreach ($students as $student) {
-            $leaderboardPointsService->recalculateFor($student);
-        }
-
-        $leaderboardNotificationService->syncDepartment((int) $departmentId);
-        $leaders = $departmentId === null
-            ? collect()
-            : User::where('role', 'student')
-                ->where('department_id', $departmentId)
-                ->orderByDesc('total_points')
-                ->orderBy('name')
-                ->orderBy('id')
-                ->take(10)
-                ->get();
-
-        // Points to: resources/views/student/Achievements/leaderboard.blade.php
-        return view('student.achievements.leaderboard', compact('leaders'));
     }
 
     private function resultPercentage(Result $result): int

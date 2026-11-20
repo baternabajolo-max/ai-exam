@@ -31,7 +31,9 @@ class StudentActivityController extends Controller
     {
         $this->ensureAdminCanViewStudent($request, $student);
         abort_unless(
-            $module->department_id === $request->user()->department_id
+            $module->department_id === $student->department_id
+                && ($request->user()->role === 'super-admin'
+                    || $module->department_id === $request->user()->department_id)
                 && $module->course_id !== null
                 && $student->course_id === $module->course_id,
             404,
@@ -168,7 +170,9 @@ class StudentActivityController extends Controller
     {
         $this->ensureAdminCanViewStudent($request, $student);
         abort_unless(
-            $module->department_id === $request->user()->department_id
+            $module->department_id === $student->department_id
+                && ($request->user()->role === 'super-admin'
+                    || $module->department_id === $request->user()->department_id)
                 && $module->course_id !== null
                 && $student->course_id === $module->course_id,
             404,
@@ -383,9 +387,10 @@ class StudentActivityController extends Controller
     private function ensureAdminCanViewStudent(Request $request, User $student): void
     {
         abort_unless(
-            $request->user()->role === 'admin'
-                && $student->role === 'student'
-                && $request->user()->department_id === $student->department_id,
+            $student->role === 'student'
+                && ($request->user()->role === 'super-admin'
+                    || ($request->user()->role === 'admin'
+                        && $request->user()->department_id === $student->department_id)),
             404,
         );
     }

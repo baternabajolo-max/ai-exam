@@ -16,6 +16,7 @@ class Module extends Model
         'logo_path',
         'department_id',
         'course_id',
+        'created_by',
     ];
 
     public function scopeForStudent(Builder $query, User $student): void
@@ -66,5 +67,10 @@ class Module extends Model
     public function subtopics(): HasMany
     {
         return $this->hasMany(Subtopic::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 }

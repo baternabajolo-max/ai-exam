@@ -14,7 +14,6 @@ use App\Models\User;
 use App\Services\AchievementUnlockService;
 use App\Services\AiService;
 use App\Services\AprioriTopicMiner;
-use App\Services\LeaderboardNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -620,7 +619,6 @@ class StudentTestController extends Controller
         Request $request,
         Test $test,
         AchievementUnlockService $achievementUnlockService,
-        LeaderboardNotificationService $leaderboardNotificationService,
     ) {
         $completedResult = $this->ensureStudentCanAccessTest($test);
         if ($completedResult !== null) {
@@ -808,7 +806,6 @@ class StudentTestController extends Controller
         ]);
         $user->refresh();
         $achievementUnlockService->syncEligible($user);
-        $leaderboardNotificationService->syncDepartment((int) $user->department_id);
 
         return redirect()->route('student.results.show', $result);
     }

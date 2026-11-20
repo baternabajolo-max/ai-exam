@@ -38,11 +38,6 @@ class BadgeAchievementSeeder extends Seeder
                     'description' => 'Maintain an active daily study streak for 30 consecutive days.',
                     'badge_image' => 'badges/Record Breaker.png',
                 ],
-                [
-                    'title' => 'Top Rank',
-                    'description' => 'Secure a spot in the Top 3 of your department leaderboard.',
-                    'badge_image' => 'badges/Top Rank.png',
-                ],
             ];
 
             foreach ($badges as $badge) {
@@ -55,7 +50,6 @@ class BadgeAchievementSeeder extends Seeder
                         'Lesson Master' => ['type' => 'module_mastery', 'required' => 3],
                         'Perfect Run' => ['type' => 'perfect_quiz', 'required' => 3],
                         'Record Breaker' => ['type' => 'daily_streak', 'required' => 30],
-                        'Top Rank' => ['type' => 'leaderboard_rank', 'required' => 3],
                     },
                     'required_points' => 0,
                     'is_active' => true,

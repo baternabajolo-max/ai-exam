@@ -511,7 +511,7 @@
                         <i class="bi bi-hourglass-split fs-5 mt-1 flex-shrink-0"></i>
                         <div class="flex-grow-1">
                             <h2 class="h6 fw-bold mb-1">30-Minute Topic Study Limit Reached</h2>
-                            <p class="small mb-3">You have reached the 30-minute maximum creditable study limit for this topic, so your timer has stopped counting additional minutes. Complete at least 1 quiz attempt on this topic to verify your study hours for the leaderboard.</p>
+                            <p class="small mb-3">You have reached the 30-minute maximum creditable study limit for this topic, so your timer has stopped counting additional minutes. Complete at least 1 quiz attempt on this topic to verify your study hours.</p>
                             <div class="d-flex flex-wrap justify-content-between gap-2">
                                 <button class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="continueUntimedStudy" type="button">Continue Reading (Untimed)</button>
                                 <a href="{{ route('student.learn.quiz', ['subtopic' => $subtopic, 'question_type' => 'multiple_choice']) }}"

@@ -183,7 +183,7 @@ class AccountManagementTest extends TestCase
         Storage::disk('public')->assertExists($student->background_picture_path);
     }
 
-    public function test_student_profile_picture_is_shown_in_the_navigation_and_leaderboard(): void
+    public function test_student_profile_picture_is_shown_in_the_navigation(): void
     {
         Storage::fake('public');
         $department = Department::create(['name' => 'Science', 'code' => 'SCI']);
@@ -200,9 +200,6 @@ class AccountManagementTest extends TestCase
             ->get(route('student.dashboard'))
             ->assertSee($profilePictureUrl, false);
 
-        $this->actingAs($student)
-            ->get(route('student.leaderboard'))
-            ->assertSee($profilePictureUrl, false);
     }
 
     public function test_student_cannot_feature_an_unclaimed_badge(): void

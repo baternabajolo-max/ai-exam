@@ -560,9 +560,6 @@
                                     <li class="nav-item">
                                         <a class="nav-link {{ request()->routeIs('student.flashcards.*') ? 'active fw-semibold' : '' }}" href="{{ route('student.flashcards.index') }}">Flashcards</a>
                                     </li>
-                                    <li class="nav-item">
-                                        <a class="nav-link {{ request()->routeIs('student.leaderboard') ? 'active fw-semibold' : '' }}" href="{{ route('student.leaderboard') }}">Leaderboard</a>
-                                    </li>
                                 @elseif(auth()->user()->role === 'admin')
                                     <li class="nav-item">
                                         <a class="nav-link {{ request()->routeIs('dashboard') ? 'active fw-semibold' : '' }}" href="{{ route('dashboard') }}" aria-label="Dashboard" data-sidebar-label="Dashboard">
@@ -618,6 +615,11 @@
                                     <li class="nav-item">
                                         <a class="nav-link {{ request()->routeIs('super-admin.monitoring*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.monitoring') }}" aria-label="Monitoring" data-sidebar-label="Monitoring">
                                             <i class="bi bi-activity sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Monitoring</span>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link {{ request()->routeIs('super-admin.modules*') ? 'active fw-semibold' : '' }}" href="{{ route('super-admin.modules.index') }}" aria-label="Modules" data-sidebar-label="Modules">
+                                            <i class="bi bi-journal-bookmark sidebar-nav-icon" aria-hidden="true"></i><span class="sidebar-nav-label">Modules</span>
                                         </a>
                                     </li>
                                     <li class="nav-item">

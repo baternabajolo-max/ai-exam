@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Subtopic extends Model
 {
@@ -23,11 +24,25 @@ class Subtopic extends Model
         'file_path',
         'extracted_text',
         'text_extraction_status',
+        'needs_revision',
+        'created_by',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'needs_revision' => 'boolean',
+        ];
+    }
 
     public function module()
     {
         return $this->belongsTo(Module::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     /**

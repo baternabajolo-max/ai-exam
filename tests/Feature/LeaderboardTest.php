@@ -16,7 +16,7 @@ class LeaderboardTest extends TestCase
 {
     use LazilyRefreshDatabase;
 
-    public function test_all_role_leaderboards_use_the_students_accessible_course_points(): void
+    public function test_student_leaderboard_is_removed_and_legacy_role_routes_redirect(): void
     {
         $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
         $softwareCourse = Course::create([
@@ -68,13 +68,6 @@ class LeaderboardTest extends TestCase
             'answers' => ['a', 'b', 'c', 'd'],
         ]);
 
-        $this->actingAs($student)
-            ->get(route('student.leaderboard'))
-            ->assertSee('Software Student')
-            ->assertSee('Systems Student')
-            ->assertSee('15 pts')
-            ->assertDontSee('Foreign Student');
-
         $this->actingAs(User::factory()->create([
             'role' => 'admin',
             'department_id' => $department->id,
@@ -86,14 +79,9 @@ class LeaderboardTest extends TestCase
             ->get(route('super-admin.leaderboard', ['department_id' => $department->id]))
             ->assertRedirect(route('super-admin.results.index', ['college_id' => $department->id]));
 
-        $this->assertDatabaseHas('users', [
-            'id' => $student->id,
-            'total_points' => 15,
-        ]);
-        $this->assertDatabaseHas('users', [
-            'id' => $systemsStudent->id,
-            'total_points' => 30,
-        ]);
+        $this->actingAs($student)
+            ->get('/student/leaderboard')
+            ->assertNotFound();
     }
 
     public function test_leaderboard_routes_redirect_users_with_another_role_to_their_dashboard(): void
@@ -110,12 +98,9 @@ class LeaderboardTest extends TestCase
             ->get(route('super-admin.leaderboard'))
             ->assertRedirect(route('admin.dashboard'));
 
-        $this->actingAs($superAdmin)
-            ->get(route('student.leaderboard'))
-            ->assertRedirect(route('super-admin.dashboard'));
     }
 
-    public function test_student_leaderboard_remains_scoped_and_faculty_legacy_route_redirects_to_results(): void
+    public function test_faculty_legacy_route_redirects_to_results(): void
     {
         $unassignedStudent = User::factory()->create([
             'name' => 'Unassigned Viewer',
@@ -132,11 +117,6 @@ class LeaderboardTest extends TestCase
             'role' => 'admin',
             'department_id' => null,
         ]);
-
-        $this->actingAs($unassignedStudent)
-            ->get(route('student.leaderboard'))
-            ->assertDontSee('Unassigned Student')
-            ->assertSee('No Points Awarded Yet');
 
         $this->actingAs($faculty)
             ->get(route('admin.leaderboard'))

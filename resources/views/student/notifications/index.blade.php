@@ -13,7 +13,7 @@
                     </span>
                 @endif
             </h1>
-            <p class="text-secondary mb-0">Messages from your administration, achievement unlocks, and leaderboard alerts.</p>
+            <p class="text-secondary mb-0">Messages from your administration and achievement unlocks.</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
             @if($hasUnreadNotifications)

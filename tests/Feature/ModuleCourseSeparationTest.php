@@ -759,6 +759,230 @@ class ModuleCourseSeparationTest extends TestCase
         $this->assertDatabaseCount('study_sessions', 0);
     }
 
+    public function test_super_admin_can_filter_modules_by_college_and_program(): void
+    {
+        $computing = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $education = Department::create(['name' => 'Education', 'code' => 'EDU']);
+        $software = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $computing->id]);
+        $teaching = Course::create(['name' => 'Teaching', 'code' => 'TEACH', 'department_id' => $education->id]);
+        $faculty = User::factory()->create(['role' => 'admin', 'department_id' => $computing->id]);
+        $superAdmin = User::factory()->create(['role' => 'super-admin']);
+        User::factory()->create([
+            'role' => 'student',
+            'department_id' => $computing->id,
+            'course_id' => $software->id,
+        ]);
+
+        $softwareModule = Module::create([
+            'title' => 'Software Foundations',
+            'department_id' => $computing->id,
+            'course_id' => $software->id,
+            'created_by' => $faculty->id,
+        ]);
+        Subtopic::create([
+            'module_id' => $softwareModule->id,
+            'title' => 'Algorithms',
+            'created_by' => $faculty->id,
+            'needs_revision' => false,
+        ]);
+        $educationModule = Module::create([
+            'title' => 'Teaching Methods',
+            'department_id' => $education->id,
+            'course_id' => $teaching->id,
+        ]);
+        Subtopic::create(['module_id' => $educationModule->id, 'title' => 'Lesson Planning']);
+
+        $this->actingAs($superAdmin)
+            ->get(route('super-admin.modules.index'))
+            ->assertSee('Faculty Modules')
+            ->assertSee('Software Foundations')
+            ->assertSee('Teaching Methods')
+            ->assertSee('id="module-college-filter"', false)
+            ->assertSee('id="module-program-filter"', false)
+            ->assertSee('Choose a college first');
+
+        $this->get(route('super-admin.modules.index', ['department_id' => $computing->id]))
+            ->assertSee('Software Foundations')
+            ->assertDontSee('Teaching Methods')
+            ->assertViewHas('topicCount', 1);
+
+        $this->get(route('super-admin.modules.index', [
+            'department_id' => $computing->id,
+            'course_id' => $software->id,
+        ]))
+            ->assertSee('Software Foundations')
+            ->assertViewHas('modules', fn ($modules): bool => $modules->count() === 1);
+
+        $this->get(route('super-admin.modules.index', ['course_id' => $software->id]))
+            ->assertNotFound();
+
+        $this->get(route('super-admin.modules.show', $softwareModule))
+            ->assertSee('Algorithms')
+            ->assertSee('Total topics')
+            ->assertSee('Flag for revision')
+            ->assertSee('id="moduleStudentActivityModal"', false)
+            ->assertSee('id="moduleStudentNoticeModal"', false)
+            ->assertSee('class="module-tabs"', false)
+            ->assertSee('aria-controls="moduleStudentsPanel"', false)
+            ->assertSee('data-student-activity-open', false)
+            ->assertSee("const activityCalendar = document.getElementById('moduleActivityCalendar')", false)
+            ->assertSee('bootstrap.Tooltip.getOrCreateInstance(element', false)
+            ->assertSee("customClass: 'module-info-tooltip-popup'", false)
+            ->assertSee('data-activity-url=', false)
+            ->assertSee('data-overview-url=', false)
+            ->assertSee('data-student-notice', false)
+            ->assertSee('id="moduleLeaderboardRows"', false)
+            ->assertSee('aria-label="Student activity drill-down"', false)
+            ->assertSee('data-activity-stage="months"', false)
+            ->assertSee('data-activity-stage="days"', false)
+            ->assertSee('data-activity-stage="topics"', false)
+            ->assertSee('id="moduleMonthlyActivityChart"', false)
+            ->assertSee('topicId === \'all\'', false);
+    }
+
+    public function test_super_admin_can_flag_topic_and_notify_responsible_faculty(): void
+    {
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
+        $faculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $superAdmin = User::factory()->create(['role' => 'super-admin']);
+        $module = Module::create([
+            'title' => 'Algorithms',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+            'created_by' => $faculty->id,
+        ]);
+        $subtopic = Subtopic::create([
+            'module_id' => $module->id,
+            'title' => 'Sorting',
+            'created_by' => $faculty->id,
+            'needs_revision' => false,
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->patch(route('super-admin.modules.subtopics.revision', $subtopic), ['needs_revision' => true])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertTrue($subtopic->fresh()->needs_revision);
+        $notification = $faculty->notifications()->firstOrFail();
+        $this->assertSame('Module topic needs revision', $notification->data['title']);
+        $this->assertSame($subtopic->id, $notification->data['subtopic_id']);
+
+        $this->actingAs($superAdmin)
+            ->patch(route('super-admin.modules.subtopics.revision', $subtopic), ['needs_revision' => false])
+            ->assertRedirect();
+
+        $this->assertFalse($subtopic->fresh()->needs_revision);
+    }
+
+    public function test_super_admin_can_open_student_module_activity_and_send_a_notice(): void
+    {
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
+        $faculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $superAdmin = User::factory()->create(['role' => 'super-admin']);
+        $student = User::factory()->create([
+            'role' => 'student',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $module = Module::create([
+            'title' => 'Software Foundations',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+            'created_by' => $faculty->id,
+        ]);
+        $topic = Subtopic::create(['module_id' => $module->id, 'title' => 'Algorithms']);
+        $quiz = StudentTest::create([
+            'title' => 'Algorithms Quiz',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+            'subtopic_id' => $topic->id,
+            'is_general' => false,
+        ]);
+        Result::create([
+            'user_id' => $student->id,
+            'test_id' => $quiz->id,
+            'score' => 8,
+            'total_questions' => 10,
+        ]);
+        StudySession::create([
+            'user_id' => $student->id,
+            'module_id' => $module->id,
+            'subtopic_id' => $topic->id,
+            'activity_date' => now()->toDateString(),
+            'active_seconds' => 600,
+            'started_at' => now()->subMinutes(10),
+            'last_heartbeat_at' => now(),
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->getJson(route('super-admin.modules.students.overview', [
+                'module' => $module,
+                'student' => $student,
+                'subtopic_id' => $topic->id,
+            ]))
+            ->assertOk()
+            ->assertJsonPath('topics.0.title', 'Algorithms')
+            ->assertJsonPath('topics.0.quiz_attempts', 1)
+            ->assertJsonPath('attempts.0.score', 80);
+
+        $this->getJson(route('super-admin.modules.students.activity', [$module, $student]))
+            ->assertOk()
+            ->assertJsonPath('topics.0.title', 'Algorithms')
+            ->assertJsonPath('topics.0.active_seconds', 600);
+
+        $this->post(route('super-admin.modules.students.notifications.store', [$module, $student]), [
+            'message' => 'Great study progress!',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('student_notifications', [
+            'student_id' => $student->id,
+            'admin_id' => $superAdmin->id,
+            'subject' => $module->title,
+            'message' => 'Great study progress!',
+            'read_at' => null,
+        ]);
+    }
+
+    public function test_super_admin_module_activity_is_limited_to_students_enrolled_in_the_module(): void
+    {
+        $department = Department::create(['name' => 'Computing', 'code' => 'COMP']);
+        $otherDepartment = Department::create(['name' => 'Education', 'code' => 'EDU']);
+        $course = Course::create(['name' => 'Software Engineering', 'code' => 'SE', 'department_id' => $department->id]);
+        $otherCourse = Course::create(['name' => 'Teaching', 'code' => 'TEACH', 'department_id' => $otherDepartment->id]);
+        $faculty = User::factory()->create(['role' => 'admin', 'department_id' => $department->id]);
+        $superAdmin = User::factory()->create(['role' => 'super-admin']);
+        $student = User::factory()->create([
+            'role' => 'student',
+            'department_id' => $otherDepartment->id,
+            'course_id' => $otherCourse->id,
+        ]);
+        $module = Module::create([
+            'title' => 'Software Foundations',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+            'created_by' => $faculty->id,
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->getJson(route('super-admin.modules.students.overview', [$module, $student]))
+            ->assertNotFound();
+
+        $this->post(route('super-admin.modules.students.notifications.store', [$module, $student]), [
+            'message' => 'Out-of-program notice',
+        ])->assertNotFound();
+        $this->assertDatabaseMissing('student_notifications', [
+            'student_id' => $student->id,
+            'message' => 'Out-of-program notice',
+        ]);
+
+        $this->actingAs($faculty)
+            ->getJson(route('super-admin.modules.students.overview', [$module, $student]))
+            ->assertRedirect(route('admin.dashboard'));
+    }
+
     private function assertModalIsOutsideTransformedContainers(TestResponse $response, string $modalId): void
     {
         $document = new \DOMDocument;

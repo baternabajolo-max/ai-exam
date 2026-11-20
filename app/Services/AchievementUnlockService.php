@@ -78,7 +78,6 @@ class AchievementUnlockService
             'module_mastery' => $this->masteredModuleCount($student) >= $required,
             'personal_record' => $this->personalRecordCount($student) >= $required,
             'daily_streak' => $student->daily_streak_state === 'active' && $student->visible_daily_streak >= $required,
-            'leaderboard_rank' => ($rank = $this->leaderboardRank($student)) !== null && $rank <= $required,
             default => false,
         };
     }
@@ -172,18 +171,5 @@ class AchievementUnlockService
             });
 
         return $recordCount;
-    }
-
-    private function leaderboardRank(User $student): ?int
-    {
-        $leaders = User::where('role', 'student')
-            ->where('department_id', $student->department_id)
-            ->orderByDesc('total_points')
-            ->orderBy('name')
-            ->pluck('id');
-
-        $rank = $leaders->search($student->id);
-
-        return $rank === false ? null : $rank + 1;
     }
 }

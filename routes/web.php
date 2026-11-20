@@ -101,6 +101,15 @@ Route::middleware(['auth', 'role:super-admin'])->prefix('super-admin')->name('su
         ->name('monitoring.faculty-contributions');
     Route::post('/monitoring/faculty/{faculty}/message', [SuperAdminController::class, 'sendFacultyMessage'])
         ->name('monitoring.faculty-message');
+    Route::get('/modules', [ModuleController::class, 'adminIndex'])->name('modules.index');
+    Route::get('/modules/{module}', [ModuleController::class, 'adminShow'])->name('modules.show');
+    Route::get('/modules/{module}/students/{student}/overview', [StudentActivityController::class, 'adminModuleStudentOverview'])
+        ->name('modules.students.overview');
+    Route::get('/modules/{module}/students/{student}/activity', [StudentActivityController::class, 'adminModuleStudentActivity'])
+        ->name('modules.students.activity');
+    Route::post('/modules/{module}/students/{student}/notifications', [ModuleController::class, 'sendStudentNotice'])
+        ->name('modules.students.notifications.store');
+    Route::patch('/modules/subtopics/{subtopic}/revision', [ModuleController::class, 'adminFlagSubtopic'])->name('modules.subtopics.revision');
     Route::get('/tests', [TestController::class, 'index'])->name('tests.index');
     Route::get('/tests/create', [TestController::class, 'create'])->name('tests.create');
     Route::get('/tests/{test}/edit', [TestController::class, 'edit'])->name('tests.edit');
@@ -193,7 +202,6 @@ Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')
     Route::post('/flashcards', [FlashcardController::class, 'store'])->name('flashcards.store');
     Route::put('/flashcards/{flashcard}', [FlashcardController::class, 'update'])->name('flashcards.update');
     Route::delete('/flashcards/{flashcard}', [FlashcardController::class, 'destroy'])->name('flashcards.destroy');
-    Route::get('/leaderboard', [StudentController::class, 'leaderboard'])->name('leaderboard');
 });
 
 // Admin Group
