@@ -141,12 +141,36 @@
     }
 
     .analysis-response-legend li {
-        align-items: center;
+        align-items: start;
         border-bottom: 1px solid #e2e8f0;
-        display: flex;
-        gap: .55rem;
-        justify-content: space-between;
+        display: grid;
+        gap: .5rem .75rem;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 9rem);
         padding: .5rem 0;
+    }
+
+    .analysis-response-choice {
+        align-items: flex-start;
+        display: flex;
+        gap: .5rem;
+        min-width: 0;
+    }
+
+    .analysis-response-choice__details {
+        display: flex;
+        flex-direction: column;
+        gap: .25rem;
+        min-width: 0;
+    }
+
+    .analysis-response-choice__label {
+        overflow-wrap: anywhere;
+    }
+
+    .analysis-response-count {
+        max-width: 9rem;
+        text-align: right;
+        white-space: normal;
     }
 
     .analysis-response-swatch {
@@ -154,6 +178,28 @@
         flex: 0 0 .75rem;
         height: .75rem;
         width: .75rem;
+    }
+
+    .admin-analysis__no-responses {
+        align-items: flex-start;
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        border-radius: .9rem;
+        color: #334155;
+        display: flex;
+        gap: .9rem;
+        padding: 1rem;
+    }
+
+    .admin-analysis__no-responses-icon {
+        align-items: center;
+        background: #e0e7ff;
+        border-radius: .75rem;
+        color: #4338ca;
+        display: inline-flex;
+        flex: 0 0 2.5rem;
+        height: 2.5rem;
+        justify-content: center;
     }
 
     .admin-analysis__review {
@@ -301,6 +347,17 @@
         background: #422006;
     }
 
+    html[data-bs-theme="dark"] .admin-analysis__no-responses {
+        background: #172033;
+        border-color: #475569;
+        color: #cbd5e1;
+    }
+
+    html[data-bs-theme="dark"] .admin-analysis__no-responses-icon {
+        background: #262f57;
+        color: #c7d2fe;
+    }
+
     html[data-bs-theme="dark"] .admin-analysis__review {
         background: #422006;
         border-color: #854d0e;
@@ -443,11 +500,23 @@
                                                     </div>
                                                     <div class="modal-body">
                                                         <h3 class="h6 fw-semibold text-dark mb-3">{{ $row['question'] }}</h3>
-                                                        <div class="alert alert-warning">
-                                                            <strong class="d-block mb-1">Latest student attempts</strong>
-                                                            Across {{ $row['total'] }} attempts: <strong>{{ $row['correct'] }} correct</strong> and <strong>{{ $row['incorrect'] }} incorrect</strong> ({{ $row['incorrect_percentage'] }}% incorrect).
-                                                            The highlighted choice is the answer key, not an individual student's response.
-                                                        </div>
+                                                        @if ($row['total'] > 0)
+                                                            <div class="alert alert-warning">
+                                                                <strong class="d-block mb-1">Latest student attempts</strong>
+                                                                Across {{ $row['total'] }} attempts: <strong>{{ $row['correct'] }} correct</strong> and <strong>{{ $row['incorrect'] }} incorrect</strong> ({{ $row['incorrect_percentage'] }}% incorrect).
+                                                                The highlighted choice is the answer key, not an individual student's response.
+                                                            </div>
+                                                        @else
+                                                            <section class="admin-analysis__no-responses mb-3" role="status">
+                                                                <span class="admin-analysis__no-responses-icon" aria-hidden="true">
+                                                                    <i class="bi bi-hourglass-split"></i>
+                                                                </span>
+                                                                <div>
+                                                                    <h4 class="h6 fw-bold mb-1">No student responses yet</h4>
+                                                                    <p class="small mb-0">Answer counts and distribution will appear here once students answer this question.</p>
+                                                                </div>
+                                                            </section>
+                                                        @endif
                                                         @if ($row['total'] > 0)
                                                             @php
                                                                 $responseColors = ['#4f46e5', '#059669', '#d97706', '#e11d48', '#0891b2', '#64748b'];
@@ -474,21 +543,21 @@
                                                                     <ul class="analysis-response-legend">
                                                                         @foreach ($row['response_breakdown'] as $responseIndex => $response)
                                                                             <li>
-                                                                                <span class="d-flex align-items-center gap-2 min-w-0">
+                                                                                <span class="analysis-response-choice">
                                                                                     <span class="analysis-response-swatch" style="background-color: {{ $responseColors[$responseIndex % count($responseColors)] }};" aria-hidden="true"></span>
-                                                                                    <span class="text-break">{{ $response['label'] }}</span>
-                                                                                    @if ($response['is_correct'])
-                                                                                        <span class="badge text-bg-success">Answer key</span>
-                                                                                    @endif
+                                                                                    <span class="analysis-response-choice__details">
+                                                                                        <span class="analysis-response-choice__label">{{ $response['label'] }}</span>
+                                                                                        @if ($response['is_correct'])
+                                                                                            <span class="badge text-bg-success align-self-start">Answer key</span>
+                                                                                        @endif
+                                                                                    </span>
                                                                                 </span>
-                                                                                <span class="small text-muted text-nowrap">{{ $response['count'] }} {{ $response['count'] === 1 ? 'response' : 'responses' }} · {{ $response['percentage'] }}%</span>
+                                                                                <span class="analysis-response-count small text-muted">{{ $response['count'] }} {{ $response['count'] === 1 ? 'response' : 'responses' }} · {{ $response['percentage'] }}%</span>
                                                                             </li>
                                                                         @endforeach
                                                                     </ul>
                                                                 </div>
                                                             </section>
-                                                        @else
-                                                            <p class="small text-muted">No student response distribution is available yet.</p>
                                                         @endif
                                                         @if ($row['correct_answer'])
                                                             <p class="small mb-2"><strong>Answer key:</strong> {{ $row['correct_answer'] }}</p>

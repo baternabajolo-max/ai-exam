@@ -363,6 +363,18 @@ class ItemAnalysisControllerTest extends TestCase
             ->assertSee('Student answer distribution')
             ->assertSee('Unanswered')
             ->assertSee('1 response · 33%')
+            ->assertSee('modal-xl modal-dialog-centered modal-dialog-scrollable faculty-analysis__question-dialog', false)
+            ->assertSee('max-height: min(24rem, 45dvh);', false)
+            ->assertSee('Individual student responses" tabindex="0"', false)
+            ->assertSee('data-faculty-answer-filter="HTTPS"', false)
+            ->assertSee('data-faculty-result-filter="correct"', false)
+            ->assertSee('data-faculty-result-filter="incorrect"', false)
+            ->assertSee('data-student-result="correct"', false)
+            ->assertSee('data-student-result="incorrect"', false)
+            ->assertSee('data-student-result="unanswered"', false)
+            ->assertSee('faculty-analysis__response-filter-cards', false)
+            ->assertSee('faculty-analysis__response-filter-count', false)
+            ->assertSee('Filter student responses by result')
             ->assertSee('FTP')
             ->assertSee('Answer key')
             ->assertSee('Latest student attempts')
@@ -453,6 +465,48 @@ class ItemAnalysisControllerTest extends TestCase
             [$firstQuestion->question, $thirdQuestion->question],
             array_column($topicFilteredResponse->viewData('analysis'), 'question'),
         );
+    }
+
+    public function test_question_review_shows_waiting_state_before_any_students_submit(): void
+    {
+        [$department, $course] = $this->createProgram('Computing', 'COMP', 'Software Engineering', 'SE');
+        $faculty = User::factory()->create([
+            'role' => 'admin',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $superAdmin = User::factory()->create(['role' => 'super-admin']);
+        $exam = $this->createExam($department->id, $course->id);
+        $question = Question::create([
+            'test_id' => $exam->id,
+            'question' => 'Which of these is a fruit?',
+            'options' => ['Apple', 'Carrot', 'Potato', 'Celery'],
+            'correct_answer' => 'Apple',
+            'explanation' => 'Apples grow from the flower of an apple tree.',
+        ]);
+
+        $facultyResponse = $this->actingAs($faculty)
+            ->get(route('admin.item-analysis.index', ['test_id' => $exam->id]));
+        $facultyResponse
+            ->assertSee($question->question)
+            ->assertSee('No student responses yet')
+            ->assertSee('Answer counts and individual student records will appear here once students answer this question.')
+            ->assertSee('Answer key:')
+            ->assertSee('Apples grow from the flower of an apple tree.')
+            ->assertDontSee('Latest student attempts')
+            ->assertDontSee('Individual student responses');
+
+        $this->actingAs($superAdmin)
+            ->get(route('super-admin.item-analysis.index', [
+                'course_id' => $course->id,
+                'test_id' => $exam->id,
+            ]))
+            ->assertSee($question->question)
+            ->assertSee('No student responses yet')
+            ->assertSee('Answer counts and distribution will appear here once students answer this question.')
+            ->assertSee('Answer key:')
+            ->assertSee('Apples grow from the flower of an apple tree.')
+            ->assertDontSee('Latest student attempts');
     }
 
     public function test_item_analysis_matches_historical_responses_without_question_ids_by_text(): void

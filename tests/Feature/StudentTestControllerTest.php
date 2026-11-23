@@ -6,6 +6,7 @@ use App\Models\Course;
 use App\Models\Department;
 use App\Models\Question;
 use App\Models\QuestionBankItem;
+use App\Models\Result;
 use App\Models\Test as Exam;
 use App\Models\TestRetakeGrant;
 use App\Models\User;
@@ -335,6 +336,46 @@ class StudentTestControllerTest extends TestCase
             ->assertSee($course->name)
             ->assertSee('Scheduled')
             ->assertDontSee('Other Program Exam');
+    }
+
+    public function test_student_exam_list_separates_missed_exams_from_available_and_taken_exams(): void
+    {
+        $this->travelTo('2026-03-20 10:00:00');
+        [$department, $course] = $this->createProgram();
+        $student = User::factory()->create([
+            'role' => 'student',
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+        ]);
+        $noDeadlineExam = $this->createExam($department->id, $course->id, '2026-03-20 07:00:00', null, 'No deadline exam');
+        $availableExam = $this->createExam($department->id, $course->id, '2026-03-20 08:00:00', '2026-03-20 11:00:00', 'Available exam');
+        $deadlineNowExam = $this->createExam($department->id, $course->id, '2026-03-20 09:00:00', '2026-03-20 10:00:00', 'Deadline now exam');
+        $upcomingExam = $this->createExam($department->id, $course->id, '2026-03-20 11:00:00', '2026-03-20 12:00:00', 'Upcoming exam');
+        $missedExam = $this->createExam($department->id, $course->id, '2026-03-20 06:00:00', '2026-03-20 09:59:00', 'Missed exam');
+        $takenExam = $this->createExam($department->id, $course->id, '2026-03-20 06:00:00', '2026-03-20 09:00:00', 'Taken exam');
+        Result::create([
+            'user_id' => $student->id,
+            'test_id' => $takenExam->id,
+            'score' => 1,
+            'total_questions' => 1,
+            'answers' => [],
+            'created_at' => '2026-03-20 08:30:00',
+        ]);
+
+        $response = $this->actingAs($student)
+            ->get(route('student.exams.index'))
+            ->assertOk()
+            ->assertSee('Missed Exams')
+            ->assertSee('Missed exam')
+            ->assertSee('1 missed')
+            ->assertSee('No submission was recorded before the deadline.');
+
+        $this->assertSame(
+            [$noDeadlineExam->id, $availableExam->id, $deadlineNowExam->id, $upcomingExam->id],
+            $response->viewData('availableExams')->modelKeys(),
+        );
+        $this->assertSame([$missedExam->id], $response->viewData('missedExams')->modelKeys());
+        $this->assertSame([$takenExam->id], $response->viewData('takenExams')->modelKeys());
     }
 
     public function test_student_can_take_exam_after_its_displayed_local_opening_time(): void

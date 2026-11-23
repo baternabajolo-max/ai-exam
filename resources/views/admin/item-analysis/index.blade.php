@@ -66,6 +66,10 @@
         padding: 1rem 1.5rem;
     }
 
+    .faculty-analysis__question-dialog {
+        --bs-modal-width: 70rem;
+    }
+
     .faculty-analysis__filter-icon {
         align-items: center;
         background: #e0e7ff;
@@ -138,13 +142,73 @@
     }
 
     .faculty-analysis__student-table {
-        min-width: 30rem;
+        table-layout: fixed;
+        width: 100%;
+    }
+
+    .faculty-analysis__student-table th:first-child,
+    .faculty-analysis__student-table td:first-child {
+        width: 30%;
+    }
+
+    .faculty-analysis__student-table th:nth-child(2),
+    .faculty-analysis__student-table td:nth-child(2) {
+        width: 46%;
+    }
+
+    .faculty-analysis__student-table th:last-child,
+    .faculty-analysis__student-table td:last-child {
+        width: 24%;
+    }
+
+    .faculty-analysis__student-responses {
+        max-height: min(24rem, 45dvh);
+        overflow: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+    }
+
+    .faculty-analysis__student-responses thead th {
+        background: #f8fafc;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+
+    .faculty-analysis__student-responses td {
+        overflow-wrap: anywhere;
+    }
+
+    .faculty-analysis__student-responses td:last-child .badge {
+        white-space: normal;
     }
 
     .faculty-analysis__percent {
         color: #64748b;
         font-size: .8rem;
         white-space: nowrap;
+    }
+
+    .faculty-analysis__no-responses {
+        align-items: flex-start;
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        border-radius: .9rem;
+        color: #334155;
+        display: flex;
+        gap: .9rem;
+        padding: 1rem;
+    }
+
+    .faculty-analysis__no-responses-icon {
+        align-items: center;
+        background: #e0e7ff;
+        border-radius: .75rem;
+        color: #4338ca;
+        display: inline-flex;
+        flex: 0 0 2.5rem;
+        height: 2.5rem;
+        justify-content: center;
     }
 
     .analysis-response-pie {
@@ -163,12 +227,154 @@
     }
 
     .analysis-response-legend li {
-        align-items: center;
+        align-items: start;
         border-bottom: 1px solid #e2e8f0;
-        display: flex;
-        gap: .55rem;
-        justify-content: space-between;
+        display: grid;
+        gap: .5rem .75rem;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 9rem);
         padding: .5rem 0;
+    }
+
+    .analysis-response-choice {
+        align-items: flex-start;
+        background: transparent;
+        border: 0;
+        border-radius: .4rem;
+        color: inherit;
+        cursor: pointer;
+        display: flex;
+        gap: .5rem;
+        min-width: 0;
+        padding: .2rem .35rem;
+        text-align: left;
+        transition: background-color 140ms ease, color 140ms ease;
+        width: 100%;
+    }
+
+    .analysis-response-choice:hover,
+    .analysis-response-choice[aria-pressed="true"] {
+        background: #eef2ff;
+        color: #3730a3;
+    }
+
+    .analysis-response-choice:focus-visible {
+        outline: 2px solid #6366f1;
+        outline-offset: 2px;
+    }
+
+    .analysis-response-choice:disabled {
+        cursor: default;
+    }
+
+    .analysis-response-choice__details {
+        display: flex;
+        flex-direction: column;
+        gap: .25rem;
+        min-width: 0;
+    }
+
+    .analysis-response-choice__label {
+        overflow-wrap: anywhere;
+    }
+
+    .analysis-response-count {
+        max-width: 9rem;
+        text-align: right;
+        white-space: normal;
+    }
+
+    .faculty-analysis__student-response-header {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: .75rem;
+        justify-content: space-between;
+    }
+
+    .faculty-analysis__student-response-heading {
+        flex: 1 1 12rem;
+        min-width: 0;
+    }
+
+    .faculty-analysis__response-filter-cards {
+        display: grid;
+        flex: 1 1 17rem;
+        gap: .4rem;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        margin-left: auto;
+        max-width: 24rem;
+    }
+
+    .faculty-analysis__response-filter-card {
+        align-items: center;
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: .65rem;
+        color: #334155;
+        cursor: pointer;
+        gap: .15rem;
+        justify-content: center;
+        min-height: 3.35rem;
+        min-width: 0;
+        padding: .35rem .2rem;
+        transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+    }
+
+    .faculty-analysis__response-filter-card:hover,
+    .faculty-analysis__response-filter-card:focus-visible {
+        box-shadow: 0 0 0 .15rem rgb(99 102 241 / 14%);
+    }
+
+    .faculty-analysis__response-filter-card:focus-visible {
+        outline: 2px solid #6366f1;
+        outline-offset: 2px;
+    }
+
+    .faculty-analysis__response-filter-card[aria-pressed="true"][data-faculty-result-filter="all"] {
+        background: #eef2ff;
+        border-color: #a5b4fc;
+        color: #3730a3;
+    }
+
+    .faculty-analysis__response-filter-card[aria-pressed="true"][data-faculty-result-filter="correct"] {
+        background: #ecfdf5;
+        border-color: #86efac;
+        color: #166534;
+    }
+
+    .faculty-analysis__response-filter-card[aria-pressed="true"][data-faculty-result-filter="incorrect"] {
+        background: #fff1f2;
+        border-color: #fda4af;
+        color: #9f1239;
+    }
+
+    .faculty-analysis__response-filter-card[aria-pressed="true"][data-faculty-result-filter="unanswered"] {
+        background: #f1f5f9;
+        border-color: #94a3b8;
+        color: #334155;
+    }
+
+    .faculty-analysis__response-filter-count {
+        font-size: 1rem;
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .faculty-analysis__response-filter-label {
+        font-size: .62rem;
+        font-weight: 700;
+        line-height: 1.15;
+        overflow-wrap: anywhere;
+        text-align: center;
+    }
+
+    @media (max-width: 575.98px) {
+        .faculty-analysis__response-filter-cards {
+            flex-basis: 100%;
+            max-width: none;
+        }
     }
 
     .analysis-response-swatch {
@@ -328,6 +534,10 @@
         color: #cbd5e1;
     }
 
+    html[data-bs-theme="dark"] .faculty-analysis__student-responses thead th {
+        background: #172033;
+    }
+
     html[data-bs-theme="dark"] .faculty-analysis__table tbody td,
     html[data-bs-theme="dark"] .faculty-analysis__table tbody tr {
         border-color: #334155;
@@ -335,6 +545,53 @@
 
     html[data-bs-theme="dark"] .faculty-analysis__table tbody tr.is-difficult > td {
         background: #422006;
+    }
+
+    html[data-bs-theme="dark"] .faculty-analysis__no-responses {
+        background: #172033;
+        border-color: #475569;
+        color: #cbd5e1;
+    }
+
+    html[data-bs-theme="dark"] .faculty-analysis__no-responses-icon {
+        background: #262f57;
+        color: #c7d2fe;
+    }
+
+    html[data-bs-theme="dark"] .analysis-response-choice:hover,
+    html[data-bs-theme="dark"] .analysis-response-choice[aria-pressed="true"] {
+        background: #262f57;
+        color: #c7d2fe;
+    }
+
+    html[data-bs-theme="dark"] .faculty-analysis__response-filter-card {
+        background: #1e293b;
+        border-color: #475569;
+        color: #e2e8f0;
+    }
+
+    html[data-bs-theme="dark"] .faculty-analysis__response-filter-card[aria-pressed="true"][data-faculty-result-filter="all"] {
+        background: #262f57;
+        border-color: #6366f1;
+        color: #c7d2fe;
+    }
+
+    html[data-bs-theme="dark"] .faculty-analysis__response-filter-card[aria-pressed="true"][data-faculty-result-filter="correct"] {
+        background: #064e3b;
+        border-color: #16a34a;
+        color: #bbf7d0;
+    }
+
+    html[data-bs-theme="dark"] .faculty-analysis__response-filter-card[aria-pressed="true"][data-faculty-result-filter="incorrect"] {
+        background: #4c0519;
+        border-color: #e11d48;
+        color: #fecdd3;
+    }
+
+    html[data-bs-theme="dark"] .faculty-analysis__response-filter-card[aria-pressed="true"][data-faculty-result-filter="unanswered"] {
+        background: #334155;
+        border-color: #94a3b8;
+        color: #e2e8f0;
     }
 
     html[data-bs-theme="dark"] .faculty-analysis__review {
@@ -372,7 +629,7 @@
     </section>
 
     <div class="modal fade" id="selectFacultyExamModal" tabindex="-1" aria-labelledby="select-faculty-exam-heading" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable faculty-analysis__question-dialog">
             <div class="modal-content faculty-analysis__modal shadow-lg">
                 <form method="GET" action="{{ route('admin.item-analysis.index') }}">
                     <div class="modal-header">
@@ -686,12 +943,24 @@
                                                     </div>
                                                     <div class="modal-body">
                                                         <h3 class="h6 fw-semibold text-dark mb-3">{{ $row['question'] }}</h3>
-                                                        <div class="alert alert-warning">
-                                                            <strong class="d-block mb-1">Latest student attempts</strong>
-                                                            Among {{ $row['total'] }} recorded responses: <strong>{{ $row['correct'] }} correct</strong> and <strong>{{ $row['incorrect'] }} incorrect</strong> ({{ $row['incorrect_percentage'] }}% incorrect).
-                                                            The highlighted choice is the answer key, not an individual student's response.
-                                                            Interpret patterns in context, especially when only a few students responded.
-                                                        </div>
+                                                        @if ($row['total'] > 0)
+                                                            <div class="alert alert-warning">
+                                                                <strong class="d-block mb-1">Latest student attempts</strong>
+                                                                Among {{ $row['total'] }} recorded responses: <strong>{{ $row['correct'] }} correct</strong> and <strong>{{ $row['incorrect'] }} incorrect</strong> ({{ $row['incorrect_percentage'] }}% incorrect).
+                                                                The highlighted choice is the answer key, not an individual student's response.
+                                                                Interpret patterns in context, especially when only a few students responded.
+                                                            </div>
+                                                        @else
+                                                            <section class="faculty-analysis__no-responses mb-3" role="status">
+                                                                <span class="faculty-analysis__no-responses-icon" aria-hidden="true">
+                                                                    <i class="bi bi-hourglass-split"></i>
+                                                                </span>
+                                                                <div>
+                                                                    <h4 class="h6 fw-bold mb-1">No student responses yet</h4>
+                                                                    <p class="small mb-0">Answer counts and individual student records will appear here once students answer this question.</p>
+                                                                </div>
+                                                            </section>
+                                                        @endif
                                                         @if ($row['most_selected_distractor'])
                                                             <section class="border rounded-3 bg-light p-3 mb-3">
                                                                 <h4 class="small fw-bold mb-1">Teaching insight</h4>
@@ -738,21 +1007,28 @@
                                                                     <ul class="analysis-response-legend">
                                                                         @foreach ($row['response_breakdown'] as $responseIndex => $response)
                                                                             <li>
-                                                                                <span class="d-flex align-items-center gap-2 min-w-0">
+                                                                                <button
+                                                                                    class="analysis-response-choice"
+                                                                                    type="button"
+                                                                                    data-faculty-answer-filter="{{ $response['label'] }}"
+                                                                                    aria-label="Filter students who chose {{ $response['label'] }}"
+                                                                                    aria-pressed="false"
+                                                                                    @disabled($row['student_responses'] === [])
+                                                                                >
                                                                                     <span class="analysis-response-swatch" style="background-color: {{ $responseColors[$responseIndex % count($responseColors)] }};" aria-hidden="true"></span>
-                                                                                    <span class="text-break">{{ $response['label'] }}</span>
-                                                                                    @if ($response['is_correct'])
-                                                                                        <span class="badge text-bg-success">Answer key</span>
-                                                                                    @endif
-                                                                                </span>
-                                                                                <span class="small text-muted text-nowrap">{{ $response['count'] }} {{ $response['count'] === 1 ? 'response' : 'responses' }} · {{ $response['percentage'] }}%</span>
+                                                                                    <span class="analysis-response-choice__details">
+                                                                                        <span class="analysis-response-choice__label">{{ $response['label'] }}</span>
+                                                                                        @if ($response['is_correct'])
+                                                                                            <span class="badge text-bg-success align-self-start">Answer key</span>
+                                                                                        @endif
+                                                                                    </span>
+                                                                                </button>
+                                                                                <span class="analysis-response-count small text-muted">{{ $response['count'] }} {{ $response['count'] === 1 ? 'response' : 'responses' }} · {{ $response['percentage'] }}%</span>
                                                                             </li>
                                                                         @endforeach
                                                                     </ul>
                                                                 </div>
                                                             </section>
-                                                        @else
-                                                            <p class="small text-muted">No student response distribution is available yet.</p>
                                                         @endif
                                                         @if ($row['correct_answer'])
                                                             <p class="small mb-2"><strong>Answer key:</strong> {{ $row['correct_answer'] }}</p>
@@ -765,20 +1041,56 @@
                                                         @elseif ($row['options'] === [] && ! $row['correct_answer'])
                                                             <p class="small text-muted mb-0">Question choices and answer details are unavailable for this item.</p>
                                                         @endif
-                                                        <section class="mt-4">
-                                                            <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-2">
-                                                                <h4 class="h6 fw-bold mb-0">Individual student responses</h4>
-                                                                <span class="small text-muted">Recorded answers from each student's latest submitted attempt</span>
-                                                            </div>
-                                                            @if ($row['student_responses'] !== [])
-                                                                <div class="table-responsive border rounded-3">
+                                                        @if ($row['student_responses'] !== [])
+                                                            @php
+                                                                $studentResponseCount = count($row['student_responses']);
+                                                                $unansweredStudentResponseCount = count(array_filter(
+                                                                    $row['student_responses'],
+                                                                    fn (array $studentResponse): bool => $studentResponse['answer'] === 'Unanswered',
+                                                                ));
+                                                                $responseFilterCounts = [
+                                                                    'all' => $studentResponseCount,
+                                                                    'correct' => $row['correct'],
+                                                                    'incorrect' => $studentResponseCount - $row['correct'] - $unansweredStudentResponseCount,
+                                                                    'unanswered' => $unansweredStudentResponseCount,
+                                                                ];
+                                                            @endphp
+                                                            <section class="mt-4" data-faculty-question-review>
+                                                                <div class="faculty-analysis__student-response-header mb-3">
+                                                                    <div class="faculty-analysis__student-response-heading">
+                                                                        <h4 class="h6 fw-bold mb-1">Individual student responses</h4>
+                                                                        <span class="small text-muted">{{ $studentResponseCount }} {{ $studentResponseCount === 1 ? 'student' : 'students' }} · Latest submitted attempt</span>
+                                                                    </div>
+                                                                    <div class="faculty-analysis__response-filter-cards" role="group" aria-label="Filter student responses by result">
+                                                                        <button class="faculty-analysis__response-filter-card" type="button" data-faculty-result-filter="all" aria-pressed="true">
+                                                                            <span class="faculty-analysis__response-filter-count" data-faculty-result-count>{{ $responseFilterCounts['all'] }}</span>
+                                                                            <span class="faculty-analysis__response-filter-label">All</span>
+                                                                        </button>
+                                                                        <button class="faculty-analysis__response-filter-card" type="button" data-faculty-result-filter="correct" aria-pressed="false">
+                                                                            <span class="faculty-analysis__response-filter-count" data-faculty-result-count>{{ $responseFilterCounts['correct'] }}</span>
+                                                                            <span class="faculty-analysis__response-filter-label">Correct</span>
+                                                                        </button>
+                                                                        <button class="faculty-analysis__response-filter-card" type="button" data-faculty-result-filter="incorrect" aria-pressed="false">
+                                                                            <span class="faculty-analysis__response-filter-count" data-faculty-result-count>{{ $responseFilterCounts['incorrect'] }}</span>
+                                                                            <span class="faculty-analysis__response-filter-label">Incorrect</span>
+                                                                        </button>
+                                                                        <button class="faculty-analysis__response-filter-card" type="button" data-faculty-result-filter="unanswered" aria-pressed="false">
+                                                                            <span class="faculty-analysis__response-filter-count" data-faculty-result-count>{{ $responseFilterCounts['unanswered'] }}</span>
+                                                                            <span class="faculty-analysis__response-filter-label">Unanswered</span>
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="table-responsive border rounded-3 faculty-analysis__student-responses" role="region" aria-label="Individual student responses" tabindex="0">
                                                                     <table class="table table-sm table-hover align-middle mb-0 faculty-analysis__student-table">
                                                                         <thead>
                                                                             <tr><th scope="col">Student</th><th scope="col">Selected answer</th><th scope="col">Result</th></tr>
                                                                         </thead>
                                                                         <tbody>
                                                                             @foreach ($row['student_responses'] as $studentResponse)
-                                                                                <tr>
+                                                                                <tr
+                                                                                    data-student-answer="{{ $studentResponse['answer'] }}"
+                                                                                    data-student-result="{{ $studentResponse['is_correct'] ? 'correct' : ($studentResponse['answer'] === 'Unanswered' ? 'unanswered' : 'incorrect') }}"
+                                                                                >
                                                                                     <td>{{ $studentResponse['student_name'] }}</td>
                                                                                     <td>{{ $studentResponse['answer'] }}</td>
                                                                                     <td>
@@ -790,13 +1102,15 @@
                                                                                     </td>
                                                                                 </tr>
                                                                             @endforeach
+                                                                            <tr data-faculty-response-empty hidden>
+                                                                                <td colspan="3" class="small text-muted text-center py-3" role="status">No students match these filters.</td>
+                                                                            </tr>
                                                                         </tbody>
                                                                     </table>
                                                                 </div>
-                                                            @else
-                                                                <p class="small text-muted mb-0">No student responses are recorded for this question.</p>
-                                                            @endif
-                                                        </section>
+                                                                <p class="visually-hidden" data-faculty-response-filter-status aria-live="polite">Showing all student responses.</p>
+                                                            </section>
+                                                        @endif
                                                         <div class="mt-3">
                                                             @if ($selectedTest->course_id && $row['topic_id'])
                                                                 <a class="btn btn-outline-primary btn-sm" href="{{ route('admin.question-bank.index', ['course_id' => $selectedTest->course_id, 'topic_id' => $row['topic_id']]) }}">
@@ -838,6 +1152,88 @@
 </main>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('[data-faculty-question-review]').forEach((responsePanel) => {
+            const answerButtons = Array.from(responsePanel.closest('.modal')?.querySelectorAll('[data-faculty-answer-filter]') ?? []);
+            const resultButtons = Array.from(responsePanel.querySelectorAll('[data-faculty-result-filter]'));
+            const studentRows = Array.from(responsePanel.querySelectorAll('[data-student-result]'));
+            const emptyMessage = responsePanel.querySelector('[data-faculty-response-empty]');
+            const filterStatus = responsePanel.querySelector('[data-faculty-response-filter-status]');
+
+            if (studentRows.length === 0 || resultButtons.length === 0) {
+                return;
+            }
+
+            let selectedAnswer = null;
+            let selectedResult = 'all';
+
+            const updateResponses = () => {
+                const normalizedAnswer = selectedAnswer?.trim().toLowerCase() ?? null;
+                const answerMatchingRows = studentRows.filter((studentRow) => {
+                    const rowAnswer = studentRow.dataset.studentAnswer?.trim().toLowerCase() ?? '';
+
+                    return normalizedAnswer === null || rowAnswer === normalizedAnswer;
+                });
+                let visibleCount = 0;
+
+                studentRows.forEach((studentRow) => {
+                    const rowAnswer = studentRow.dataset.studentAnswer?.trim().toLowerCase() ?? '';
+                    const matchesAnswer = normalizedAnswer === null || rowAnswer === normalizedAnswer;
+                    const matchesResult = selectedResult === 'all' || studentRow.dataset.studentResult === selectedResult;
+                    const isVisible = matchesAnswer && matchesResult;
+
+                    studentRow.hidden = !isVisible;
+                    visibleCount += isVisible ? 1 : 0;
+                });
+
+                if (emptyMessage) {
+                    emptyMessage.hidden = visibleCount > 0;
+                }
+
+                answerButtons.forEach((button) => {
+                    const isSelected = selectedAnswer === button.dataset.facultyAnswerFilter;
+
+                    button.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+                });
+
+                resultButtons.forEach((button) => {
+                    const resultFilter = button.dataset.facultyResultFilter ?? 'all';
+                    const isSelected = selectedResult === resultFilter;
+                    const resultCount = resultFilter === 'all'
+                        ? answerMatchingRows.length
+                        : answerMatchingRows.filter((studentRow) => studentRow.dataset.studentResult === resultFilter).length;
+                    const countElement = button.querySelector('[data-faculty-result-count]');
+
+                    button.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+                    if (countElement) {
+                        countElement.textContent = String(resultCount);
+                    }
+                });
+
+                const resultLabel = selectedResult === 'all' ? '' : `${selectedResult} `;
+                const answerLabel = selectedAnswer === null ? '' : ` for "${selectedAnswer}"`;
+
+                if (filterStatus) {
+                    filterStatus.textContent = `Showing ${visibleCount} ${resultLabel}response${visibleCount === 1 ? '' : 's'}${answerLabel}.`;
+                }
+            };
+
+            answerButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    selectedAnswer = selectedAnswer === button.dataset.facultyAnswerFilter
+                        ? null
+                        : button.dataset.facultyAnswerFilter;
+                    updateResponses();
+                });
+            });
+
+            resultButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    selectedResult = button.dataset.facultyResultFilter ?? 'all';
+                    updateResponses();
+                });
+            });
+        });
+
         const programInput = document.getElementById('faculty-program');
         const programLabel = document.querySelector('[data-faculty-program-label]');
         const examPicker = document.getElementById('faculty-exam-picker');

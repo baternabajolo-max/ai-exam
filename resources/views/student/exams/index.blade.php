@@ -149,6 +149,12 @@
         color: #475569;
     }
 
+    .student-exams__status--missed {
+        background: #fff7ed;
+        border-color: #fed7aa;
+        color: #9a3412;
+    }
+
     .student-exams__status--completed {
         background: #dbeafe;
         border-color: #bfdbfe;
@@ -405,6 +411,12 @@
         color: #cbd5e1;
     }
 
+    html[data-bs-theme="dark"] .student-exams__status--missed {
+        background: #431407;
+        border-color: #9a3412;
+        color: #fed7aa;
+    }
+
     html[data-bs-theme="dark"] .student-exams__status--completed {
         background: #172554;
         border-color: #1d4ed8;
@@ -452,13 +464,18 @@
         }
 
         .student-exams__tabs {
+            display: grid;
+            gap: .25rem;
+            grid-template-columns: minmax(0, 1fr);
             width: 100%;
         }
 
         .student-exams__tabs .student-exams__tab {
-            flex: 1 1 50%;
+            justify-content: flex-start;
+            width: 100%;
             gap: .35rem;
             padding-inline: .5rem;
+            white-space: normal;
         }
     }
 
@@ -478,7 +495,7 @@
         <div class="student-exams__header-main">
             <div class="student-exams__eyebrow mb-2">Your assessments</div>
             <h1 class="h2 fw-bold mb-1">Examinations</h1>
-            <p class="text-muted mb-0">Review upcoming deadlines, start an available exam, or revisit results from exams you have completed.</p>
+            <p class="text-muted mb-0">Review upcoming deadlines, start an available exam, check missed deadlines, or revisit completed results.</p>
             <div class="student-exams__tabs-shell">
                 <ul class="nav nav-pills student-exams__tabs" id="studentExamTabs" role="tablist" aria-label="Examinations by completion status">
                     <li class="nav-item" role="presentation">
@@ -513,6 +530,22 @@
                             <span class="student-exams__tab-count">{{ $takenExams->count() }}</span>
                         </button>
                     </li>
+                    <li class="nav-item" role="presentation">
+                        <button
+                            class="nav-link student-exams__tab"
+                            id="missed-exams-tab"
+                            data-bs-toggle="pill"
+                            data-bs-target="#missed-exams-panel"
+                            type="button"
+                            role="tab"
+                            aria-controls="missed-exams-panel"
+                            aria-selected="false"
+                        >
+                            <i class="bi bi-calendar-x" aria-hidden="true"></i>
+                            <span>Missed Exams</span>
+                            <span class="student-exams__tab-count">{{ $missedExams->count() }}</span>
+                        </button>
+                    </li>
                 </ul>
             </div>
         </div>
@@ -521,7 +554,7 @@
                 <span class="student-exams__summary-icon" aria-hidden="true"><i class="bi bi-journal-check"></i></span>
                 <div>
                     <span class="small text-muted d-block">Your progress</span>
-                    <strong>{{ $availableExams->count() }} available · {{ $takenExams->count() }} taken</strong>
+                    <strong>{{ $availableExams->count() }} available · {{ $takenExams->count() }} taken · {{ $missedExams->count() }} missed</strong>
                 </div>
             </div>
             <div class="student-exams__notice small">
@@ -574,14 +607,16 @@
                     <div class="col-12">
                         <div class="student-exams__empty">
                             <span class="student-exams__empty-icon" aria-hidden="true"><i class="bi bi-check2-circle"></i></span>
-                            <h2 class="h4 fw-bold">You’re all caught up</h2>
-                            <p class="text-muted mb-0">
-                                @if ($takenExams->isNotEmpty())
-                                    You have completed all currently listed examinations. Your results are available in Taken Exams.
-                                @else
-                                    There are no scheduled examinations for your program right now.
-                                @endif
-                            </p>
+                            @if ($missedExams->isNotEmpty())
+                                <h2 class="h4 fw-bold">No exams available right now</h2>
+                                <p class="text-muted mb-0">Review the Missed Exams tab for past deadlines.</p>
+                            @elseif ($takenExams->isNotEmpty())
+                                <h2 class="h4 fw-bold">You’re all caught up</h2>
+                                <p class="text-muted mb-0">You have completed all currently listed examinations. Your results are available in Taken Exams.</p>
+                            @else
+                                <h2 class="h4 fw-bold">No exams scheduled</h2>
+                                <p class="text-muted mb-0">There are no scheduled examinations for your program right now.</p>
+                            @endif
                         </div>
                     </div>
                 @endforelse
@@ -632,6 +667,40 @@
                             <span class="student-exams__empty-icon" aria-hidden="true"><i class="bi bi-journal-check"></i></span>
                             <h2 class="h4 fw-bold">No completed exams yet</h2>
                             <p class="text-muted mb-0">After you submit an examination, its date and score will appear here.</p>
+                        </div>
+                    </div>
+                @endforelse
+            </div>
+        </section>
+
+        <section class="tab-pane fade" id="missed-exams-panel" role="tabpanel" aria-labelledby="missed-exams-tab" tabindex="0">
+            <div class="row g-3 g-lg-4">
+                @forelse ($missedExams as $exam)
+                    <div class="col-12 col-sm-6 col-xl-4">
+                        <article class="student-exams__card">
+                            <div class="student-exams__card-body">
+                                <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                                    <span class="badge rounded-pill student-exams__status student-exams__status--missed">
+                                        <i class="bi bi-calendar-x me-1" aria-hidden="true"></i>Missed
+                                    </span>
+                                </div>
+                                <h2 class="student-exams__title h4 fw-bold mb-1">{{ $exam->title }}</h2>
+                                <p class="student-exams__program"><i class="bi bi-mortarboard-fill" aria-hidden="true"></i>{{ $exam->course?->name ?? 'Program not specified' }}</p>
+                                <p class="student-exams__description text-muted mb-3">{{ $exam->description ?: $exam->topic }}</p>
+                                <dl class="student-exams__details small">
+                                    <div class="student-exams__detail"><dt><i class="bi bi-calendar-x me-1" aria-hidden="true"></i>Deadline</dt><dd>{{ $exam->available_until?->format('M j, Y g:i A') ?? 'No deadline' }}</dd></div>
+                                    <div class="student-exams__detail"><dt><i class="bi bi-calendar-event me-1" aria-hidden="true"></i>Opened</dt><dd>{{ $exam->available_from?->format('M j, Y g:i A') ?? 'Immediately' }}</dd></div>
+                                </dl>
+                                <p class="small text-muted mb-0 mt-auto">No submission was recorded before the deadline.</p>
+                            </div>
+                        </article>
+                    </div>
+                @empty
+                    <div class="col-12">
+                        <div class="student-exams__empty">
+                            <span class="student-exams__empty-icon" aria-hidden="true"><i class="bi bi-calendar-check"></i></span>
+                            <h2 class="h4 fw-bold">No missed exams</h2>
+                            <p class="text-muted mb-0">Exams whose deadline passes without a submission will appear here.</p>
                         </div>
                     </div>
                 @endforelse

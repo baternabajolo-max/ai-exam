@@ -59,15 +59,21 @@ class StudentTestController extends Controller
             ])
             ->orderBy('available_from')
             ->get();
-        $availableExams = $exams
-            ->filter(fn (Test $exam): bool => $exam->results->isEmpty())
+        $unsubmittedExams = $exams
+            ->filter(fn (Test $exam): bool => $exam->results->isEmpty());
+        $now = now();
+        $missedExams = $unsubmittedExams
+            ->filter(fn (Test $exam): bool => $exam->available_until?->isBefore($now) === true)
+            ->values();
+        $availableExams = $unsubmittedExams
+            ->reject(fn (Test $exam): bool => $exam->available_until?->isBefore($now) === true)
             ->values();
         $takenExams = $exams
             ->filter(fn (Test $exam): bool => $exam->results->isNotEmpty())
             ->sortByDesc(fn (Test $exam) => $exam->results->first()?->created_at)
             ->values();
 
-        return view('student.exams.index', compact('availableExams', 'takenExams'));
+        return view('student.exams.index', compact('availableExams', 'missedExams', 'takenExams'));
     }
 
     public function startExam(Test $test)
